@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./job_tracker.db"
     backend_cors_origins: str = "http://localhost:5173,http://localhost:4173"
     seed_demo_data: bool = True
+    secret_key: str = "development-only-secret-key-change-me"
+    access_token_expire_minutes: int = 60 * 24 * 7
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -22,4 +24,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

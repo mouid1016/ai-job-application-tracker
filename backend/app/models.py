@@ -1,8 +1,8 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
-from sqlalchemy import Date, DateTime, Enum as SqlEnum, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Date, DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 
@@ -16,10 +16,34 @@ class ApplicationStatus(str, Enum):
     rejected = "rejected"
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    applications: Mapped[list["Application"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
 class Application(Base):
     __tablename__ = "applications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     company: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     location: Mapped[str | None] = mapped_column(String(160))
@@ -47,3 +71,4 @@ class Application(Base):
         nullable=False,
     )
 
+    user: Mapped[User] = relationship(back_populates="applications")
