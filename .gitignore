@@ -1,0 +1,24 @@
+# Environment and secrets
+.env
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+
+# Node
+node_modules/
+dist/
+
+# Editors and OS
+.idea/
+.DS_Store
+Thumbs.db
+

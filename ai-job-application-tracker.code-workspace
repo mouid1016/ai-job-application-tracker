@@ -1,0 +1,14 @@
+{
+  "folders": [
+    {
+      "name": "AI Job Application Tracker",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true,
+    "typescript.tsdk": "frontend/node_modules/typescript/lib",
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python"
+  }
+}
+
