@@ -1,6 +1,6 @@
 # AI Job Application Tracker
 
-A portfolio-ready full-stack starter for tracking job applications on a Kanban board. The first milestone includes a responsive React dashboard, FastAPI CRUD API, PostgreSQL persistence, demo data, and Docker setup.
+A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, per-user data isolation, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
 
 ## Quick start (recommended)
 
@@ -20,6 +20,15 @@ Open:
 - Health check: http://localhost:8000/api/health
 
 The app creates its tables and optional demo applications automatically. To stop it, run `docker compose down`. Your PostgreSQL data remains in the `postgres_data` Docker volume.
+
+### Demo account
+
+```text
+Email:    demo@applyflow.dev
+Password: demo1234
+```
+
+You can also register a fresh account. Each account sees only its own applications.
 
 ## Open in VS Code
 
@@ -74,6 +83,9 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 ## Included features
 
 - Dashboard metrics for total applications, interviews, offers, and response rate
+- Registration, login, persistent sessions, and logout
+- Argon2 password hashing and signed JWT access tokens
+- Per-user application ownership and API-level data isolation
 - Responsive Kanban workflow: Saved → Applied → Assessment → Interview → Offer → Rejected
 - Native drag-and-drop status updates
 - Create and delete applications
@@ -87,6 +99,9 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Service and database health |
+| `POST` | `/api/auth/register` | Create an account and receive a token |
+| `POST` | `/api/auth/login` | Sign in and receive a token |
+| `GET` | `/api/auth/me` | Read the authenticated user |
 | `GET` | `/api/applications` | List applications |
 | `POST` | `/api/applications` | Create an application |
 | `GET` | `/api/applications/{id}` | Read one application |
@@ -124,8 +139,8 @@ ai-job-application-tracker/
 
 ## Next milestones
 
-1. JWT registration and login with per-user application ownership
-2. Full application detail page and activity timeline
-3. CV upload and job-description storage
-4. Structured AI skill extraction and deterministic match scoring
-5. Cover letters, interview questions, tests, and CI
+1. Full application detail page and activity timeline
+2. CV upload and job-description storage
+3. Structured AI skill extraction and deterministic match scoring
+4. Cover letters and interview questions
+5. Automated tests, Alembic migrations, and CI

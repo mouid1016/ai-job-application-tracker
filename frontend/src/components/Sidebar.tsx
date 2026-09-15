@@ -1,6 +1,16 @@
 import { Icon } from "./Icon";
+import type { User } from "../types";
 
-export function Sidebar() {
+interface SidebarProps {
+  user: User;
+  onLogout: () => void;
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+export function Sidebar({ user, onLogout }: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -16,12 +26,11 @@ export function Sidebar() {
 
       <div className="sidebar-bottom">
         <a className="nav-item" href="#settings"><Icon name="settings" /> Settings</a>
-        <div className="profile">
-          <span className="avatar">JD</span>
-          <span><strong>Job seeker</strong><small>Portfolio mode</small></span>
-        </div>
+        <button className="profile" onClick={onLogout} title="Sign out">
+          <span className="avatar">{initials(user.name)}</span>
+          <span><strong>{user.name}</strong><small>Sign out</small></span>
+        </button>
       </div>
     </aside>
   );
 }
-

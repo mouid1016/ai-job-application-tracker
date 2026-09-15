@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
 
 from .models import ApplicationStatus
 
@@ -58,3 +58,43 @@ class StatsRead(BaseModel):
     offers: int
     response_rate: float
 
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("email")
+    @classmethod
+    def normalise_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def normalise_login_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
+
+
+class UserRead(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenRead(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserRead
