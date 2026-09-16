@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api";
-import type { Activity, ApplicationStatus, ApplicationUpdate, CvDocument, JobApplication } from "../types";
+import type { Activity, AIAnalysis, ApplicationStatus, ApplicationUpdate, CvDocument, JobApplication } from "../types";
 import { Icon } from "./Icon";
 
 interface ApplicationDetailModalProps {
@@ -56,6 +56,9 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
   const [cv, setCv] = useState<CvDocument | null>(null);
   const [loadingCv, setLoadingCv] = useState(true);
   const [uploadingCv, setUploadingCv] = useState(false);
+  const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(true);
+  const [runningAnalysis, setRunningAnalysis] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,18 +83,29 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
     }
   }, [application.id]);
 
+  const loadAnalysis = useCallback(async () => {
+    try {
+      setAnalysis(await api.getAnalysis(application.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load the match analysis");
+    } finally {
+      setLoadingAnalysis(false);
+    }
+  }, [application.id]);
+
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     window.addEventListener("keydown", closeOnEscape);
     const timer = window.setTimeout(() => {
       void loadActivities();
       void loadCv();
+      void loadAnalysis();
     }, 0);
     return () => {
       window.removeEventListener("keydown", closeOnEscape);
       window.clearTimeout(timer);
     };
-  }, [loadActivities, loadCv, onClose]);
+  }, [loadActivities, loadAnalysis, loadCv, onClose]);
 
   async function uploadCv(file: File | undefined) {
     if (!file) return;
@@ -107,6 +121,8 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       setUploadingCv(true);
       setError(null);
       setCv(await api.uploadCv(application.id, file));
+      onSaved(await api.getApplication(application.id));
+      await loadAnalysis();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
@@ -139,6 +155,8 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       setError(null);
       await api.deleteCv(application.id);
       setCv(null);
+      onSaved(await api.getApplication(application.id));
+      await loadAnalysis();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
@@ -153,9 +171,8 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
     setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    const payload: ApplicationUpdate = {
+  function applicationPayload(): ApplicationUpdate {
+    return {
       company: form.company,
       role: form.role,
       location: form.location || null,
@@ -166,18 +183,49 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       notes: form.notes || null,
       job_description: form.job_description || null,
     };
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
     try {
       setSaving(true);
       setError(null);
-      const updated = await api.updateApplication(application.id, payload);
+      const updated = await api.updateApplication(application.id, applicationPayload());
       onSaved(updated);
       setSaved(true);
+      await loadAnalysis();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not save this application");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function runAnalysis() {
+    if (!cv) {
+      setError("Upload a CV before running match analysis");
+      return;
+    }
+    if (!form.job_description.trim()) {
+      setError("Paste a job description before running match analysis");
+      return;
+    }
+    try {
+      setRunningAnalysis(true);
+      setError(null);
+      const updated = await api.updateApplication(application.id, applicationPayload());
+      const result = await api.runAnalysis(application.id);
+      setAnalysis(result);
+      onSaved({ ...updated, match_score: result.match_score });
+      setSaved(true);
+      setLoadingHistory(true);
+      await loadActivities();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not analyse this application");
+    } finally {
+      setRunningAnalysis(false);
     }
   }
 
@@ -240,7 +288,38 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
             </section>
 
             <label className="detail-textarea-label">Personal notes<textarea rows={4} value={form.notes} onChange={(event) => update("notes", event.target.value)} placeholder="Recruiter details, interview preparation and reminders…" /></label>
-            <label className="detail-textarea-label">Job description<textarea rows={9} value={form.job_description} onChange={(event) => update("job_description", event.target.value)} placeholder="Paste the full job description here. This will power AI matching in the next milestone." /></label>
+            <label className="detail-textarea-label">Job description<textarea rows={9} value={form.job_description} onChange={(event) => update("job_description", event.target.value)} placeholder="Paste the full job description here. It will be compared with the attached CV." /></label>
+
+            <section className="analysis-section" aria-labelledby="analysis-heading">
+              <div className="analysis-heading">
+                <div className="analysis-title"><span><Icon name="sparkles" size={17} /></span><div><h3 id="analysis-heading">AI match analysis</h3><p>CV evidence compared with this job description</p></div></div>
+                {analysis && <span className="analysis-provider">{analysis.provider === "openai" ? "OpenAI" : "Local engine"}</span>}
+              </div>
+              {loadingAnalysis ? (
+                <div className="analysis-loading"><span className="spinner" /></div>
+              ) : analysis ? (
+                <div className="analysis-results">
+                  {analysis.is_stale && <div className="analysis-stale">Your CV or job description changed. Run the analysis again for an up-to-date score.</div>}
+                  <div className="analysis-overview">
+                    <div className="score-ring" style={{ "--score": `${analysis.match_score * 3.6}deg` } as React.CSSProperties}><strong>{analysis.match_score}%</strong><span>match</span></div>
+                    <div><strong>{analysis.matching_skills.length} of {analysis.job_skills.length} job skills found</strong><p>{analysis.summary}</p></div>
+                  </div>
+                  <div className="skill-columns">
+                    <div><h4>Matching skills</h4><div className="skill-tags">{analysis.matching_skills.length ? analysis.matching_skills.map((skill) => <span className="matched" key={skill}>✓ {skill}</span>) : <em>No direct matches identified</em>}</div></div>
+                    <div><h4>Missing skills</h4><div className="skill-tags">{analysis.missing_skills.length ? analysis.missing_skills.map((skill) => <span className="missing" key={skill}>{skill}</span>) : <em>No missing named skills</em>}</div></div>
+                  </div>
+                  <div className="analysis-notes">
+                    <div><h4>Strengths</h4><ul>{analysis.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                    <div><h4>Recommended improvements</h4><ul>{analysis.recommendations.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  </div>
+                </div>
+              ) : (
+                <div className="analysis-empty"><strong>Ready when your inputs are</strong><p>Attach a readable CV and paste the job description, then generate an explainable skill-coverage score.</p></div>
+              )}
+              <button className="analysis-button" type="button" onClick={() => void runAnalysis()} disabled={runningAnalysis || !cv || !form.job_description.trim()}>
+                {runningAnalysis ? <><span className="spinner" /> Analysing CV…</> : <><Icon name="sparkles" size={15} /> {analysis ? "Run analysis again" : "Analyse CV match"}</>}
+              </button>
+            </section>
 
             {error && <div className="auth-error" role="alert">{error}</div>}
             <div className="detail-actions">
@@ -259,7 +338,7 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
               <ol className="activity-list">
                 {activities.map((activity) => (
                   <li key={activity.id} className={activity.event_type}>
-                    <span className="activity-icon"><Icon name={activity.event_type.startsWith("cv_") ? "document" : activity.event_type === "status_changed" ? "chart" : activity.event_type === "created" ? "plus" : "briefcase"} size={14} /></span>
+                    <span className="activity-icon"><Icon name={activity.event_type === "analysis_completed" ? "sparkles" : activity.event_type.startsWith("cv_") ? "document" : activity.event_type === "status_changed" ? "chart" : activity.event_type === "created" ? "plus" : "briefcase"} size={14} /></span>
                     <div><strong>{activity.description}</strong><time>{formatActivityDate(activity.created_at)}</time></div>
                   </li>
                 ))}

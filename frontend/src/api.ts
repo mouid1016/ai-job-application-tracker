@@ -1,5 +1,6 @@
 import type {
   Activity,
+  AIAnalysis,
   ApplicationCreate,
   ApplicationStatus,
   ApplicationUpdate,
@@ -92,6 +93,8 @@ export const api = {
   },
   downloadCv: (id: number) => download(`/applications/${id}/documents/cv/download`),
   deleteCv: (id: number) => request<void>(`/applications/${id}/documents/cv`, { method: "DELETE" }),
+  getAnalysis: (id: number) => request<AIAnalysis | null>(`/applications/${id}/analysis`),
+  runAnalysis: (id: number) => request<AIAnalysis>(`/applications/${id}/analysis`, { method: "POST" }),
   getStats: () => request<DashboardStats>("/stats"),
   createApplication: (payload: ApplicationCreate) =>
     request<JobApplication>("/applications", {

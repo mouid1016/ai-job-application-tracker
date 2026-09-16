@@ -1,6 +1,6 @@
 # AI Job Application Tracker
 
-A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
+A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, explainable AI job matching, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
 
 ## Quick start (recommended)
 
@@ -29,6 +29,17 @@ Password: demo1234
 ```
 
 You can also register a fresh account. Each account sees only its own applications.
+
+### Optional OpenAI enhancement
+
+The matching feature works without a paid API key using the built-in deterministic skills engine. To add richer structured extraction and recommendations, put an OpenAI API key in `.env`:
+
+```text
+OPENAI_API_KEY=your-key-here
+OPENAI_MODEL=gpt-6-astra
+```
+
+The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled.
 
 ## Open in VS Code
 
@@ -92,6 +103,8 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 - Full application workspace with notes and job-description storage
 - Automatic activity timeline for status and detail changes
 - Private PDF/DOCX CV upload, replacement, download, deletion, and text extraction
+- Explainable CV-to-job skill matching with deterministic coverage scores
+- Optional OpenAI Structured Outputs for richer extraction and recommendations
 - Search by company or role
 - FastAPI CRUD endpoints with automatic Swagger docs
 - PostgreSQL in Docker and SQLite for quick local development
@@ -115,6 +128,8 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `POST` | `/api/applications/{id}/documents/cv` | Upload or replace a PDF/DOCX CV |
 | `GET` | `/api/applications/{id}/documents/cv/download` | Download the authenticated user's CV |
 | `DELETE` | `/api/applications/{id}/documents/cv` | Remove a CV |
+| `GET` | `/api/applications/{id}/analysis` | Read the saved match analysis |
+| `POST` | `/api/applications/{id}/analysis` | Analyse the CV against the job description |
 | `GET` | `/api/stats` | Dashboard statistics |
 
 ## Project structure
@@ -147,7 +162,6 @@ ai-job-application-tracker/
 
 ## Next milestones
 
-1. Structured AI skill extraction and deterministic match scoring
-2. Cover letters and interview questions
-3. Automated tests, Alembic migrations, and CI
-4. Deployment and a public demo environment
+1. Tailored cover letters and interview questions
+2. Automated tests, Alembic migrations, and CI
+3. Deployment and a public demo environment

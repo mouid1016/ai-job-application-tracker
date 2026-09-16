@@ -70,6 +70,25 @@ export interface CvDocument {
   uploaded_at: string;
 }
 
+export interface AIAnalysis {
+  id: number;
+  application_id: number;
+  match_score: number;
+  skill_coverage: number;
+  matching_skills: string[];
+  missing_skills: string[];
+  cv_skills: string[];
+  job_skills: string[];
+  strengths: string[];
+  recommendations: string[];
+  summary: string;
+  provider: "openai" | "local" | "local_fallback" | string;
+  model: string | null;
+  is_stale: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardStats {
   total: number;
   active: number;
