@@ -110,3 +110,27 @@ class ActivityRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentRead(BaseModel):
+    id: int
+    application_id: int
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    extracted_characters: int
+    extraction_status: str
+    uploaded_at: datetime
+
+    @classmethod
+    def from_document(cls, document: object) -> "DocumentRead":
+        return cls(
+            id=document.id,
+            application_id=document.application_id,
+            original_filename=document.original_filename,
+            content_type=document.content_type,
+            size_bytes=document.size_bytes,
+            extracted_characters=len(document.extracted_text),
+            extraction_status=document.extraction_status,
+            uploaded_at=document.uploaded_at,
+        )

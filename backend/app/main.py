@@ -1,19 +1,22 @@
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import Base, SessionLocal, engine, get_db
-from .models import Activity, Application, ApplicationStatus, User
+from .document_service import document_path, read_upload, remove_document, store_document
+from .models import Activity, Application, ApplicationStatus, Document, User
 from .schemas import (
     ActivityRead,
     ApplicationCreate,
     ApplicationRead,
     ApplicationUpdate,
+    DocumentRead,
     LoginRequest,
     RegisterRequest,
     StatsRead,
@@ -160,7 +163,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.2.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -384,6 +387,132 @@ def list_activities(
     return list(db.scalars(statement).all())
 
 
+def find_cv(application_id: int, user_id: int, db: Session) -> Document | None:
+    return db.scalar(
+        select(Document).where(
+            Document.application_id == application_id,
+            Document.user_id == user_id,
+        )
+    )
+
+
+@app.get("/api/applications/{application_id}/documents/cv", response_model=DocumentRead | None)
+def get_cv(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentRead | None:
+    find_application(application_id, current_user.id, db)
+    document = find_cv(application_id, current_user.id, db)
+    return DocumentRead.from_document(document) if document else None
+
+
+@app.post(
+    "/api/applications/{application_id}/documents/cv",
+    response_model=DocumentRead,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_cv(
+    application_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DocumentRead:
+    application = find_application(application_id, current_user.id, db)
+    original_filename, content_type, content, extracted_text = await read_upload(file)
+    stored_filename = store_document(content, content_type)
+    previous = find_cv(application_id, current_user.id, db)
+
+    try:
+        if previous is not None:
+            previous_stored_filename = previous.stored_filename
+            previous_original_filename = previous.original_filename
+            db.delete(previous)
+            db.flush()
+        else:
+            previous_stored_filename = None
+            previous_original_filename = None
+
+        document = Document(
+            application_id=application.id,
+            user_id=current_user.id,
+            original_filename=original_filename,
+            stored_filename=stored_filename,
+            content_type=content_type,
+            size_bytes=len(content),
+            extracted_text=extracted_text,
+            extraction_status="complete",
+        )
+        db.add(document)
+        db.flush()
+        db.add(
+            Activity(
+                application_id=application.id,
+                event_type="cv_replaced" if previous_original_filename else "cv_uploaded",
+                description=(
+                    f"Replaced {previous_original_filename} with {original_filename}"
+                    if previous_original_filename
+                    else f"Uploaded CV: {original_filename}"
+                ),
+                old_value=previous_original_filename,
+                new_value=original_filename,
+            )
+        )
+        db.commit()
+        db.refresh(document)
+    except Exception:
+        db.rollback()
+        remove_document(stored_filename)
+        raise
+
+    if previous_stored_filename:
+        remove_document(previous_stored_filename)
+    return DocumentRead.from_document(document)
+
+
+@app.get("/api/applications/{application_id}/documents/cv/download")
+def download_cv(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    find_application(application_id, current_user.id, db)
+    document = find_cv(application_id, current_user.id, db)
+    if document is None:
+        raise HTTPException(status_code=404, detail="CV not found")
+    return FileResponse(
+        document_path(document.stored_filename),
+        media_type=document.content_type,
+        filename=document.original_filename,
+    )
+
+
+@app.delete("/api/applications/{application_id}/documents/cv", status_code=status.HTTP_204_NO_CONTENT)
+def delete_cv(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    application = find_application(application_id, current_user.id, db)
+    document = find_cv(application_id, current_user.id, db)
+    if document is None:
+        raise HTTPException(status_code=404, detail="CV not found")
+    stored_filename = document.stored_filename
+    original_filename = document.original_filename
+    db.delete(document)
+    db.add(
+        Activity(
+            application_id=application.id,
+            event_type="cv_removed",
+            description=f"Removed CV: {original_filename}",
+            old_value=original_filename,
+        )
+    )
+    db.commit()
+    remove_document(stored_filename)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.delete("/api/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_application(
     application_id: int,
@@ -391,8 +520,12 @@ def delete_application(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     application = find_application(application_id, current_user.id, db)
+    cv = find_cv(application.id, current_user.id, db)
+    stored_filename = cv.stored_filename if cv else None
     db.delete(application)
     db.commit()
+    if stored_filename:
+        remove_document(stored_filename)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

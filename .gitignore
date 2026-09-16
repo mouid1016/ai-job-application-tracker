@@ -12,6 +12,7 @@ venv/
 .coverage
 htmlcov/
 *.db
+backend/uploads/
 
 # Node
 node_modules/
@@ -21,4 +22,3 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
-

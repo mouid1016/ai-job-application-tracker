@@ -1,5 +1,5 @@
 interface IconProps {
-  name: "briefcase" | "grid" | "sparkles" | "chart" | "settings" | "search" | "plus" | "calendar" | "pin" | "trash";
+  name: "briefcase" | "grid" | "sparkles" | "chart" | "settings" | "search" | "plus" | "calendar" | "pin" | "trash" | "document" | "download";
   size?: number;
 }
 
@@ -15,6 +15,8 @@ export function Icon({ name, size = 18 }: IconProps) {
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
     pin: <><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2"/></>,
     trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></>,
+    document: <><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h6"/></>,
+    download: <><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></>,
   };
 
   return (
@@ -23,4 +25,3 @@ export function Icon({ name, size = 18 }: IconProps) {
     </svg>
   );
 }
-

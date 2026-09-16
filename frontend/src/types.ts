@@ -59,6 +59,17 @@ export interface Activity {
   created_at: string;
 }
 
+export interface CvDocument {
+  id: number;
+  application_id: number;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  extracted_characters: number;
+  extraction_status: "complete" | string;
+  uploaded_at: string;
+}
+
 export interface DashboardStats {
   total: number;
   active: number;
