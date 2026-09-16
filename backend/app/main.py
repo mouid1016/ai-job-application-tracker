@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import Base, SessionLocal, engine, get_db
-from .models import Application, ApplicationStatus, User
+from .models import Activity, Application, ApplicationStatus, User
 from .schemas import (
+    ActivityRead,
     ApplicationCreate,
     ApplicationRead,
     ApplicationUpdate,
@@ -125,10 +126,32 @@ def seed_database() -> None:
         db.commit()
 
 
+def backfill_activity_history() -> None:
+    """Give pre-existing applications a clear starting event."""
+    with SessionLocal() as db:
+        applications = db.scalars(
+            select(Application).where(
+                Application.id.not_in(select(Activity.application_id))
+            )
+        ).all()
+        for application in applications:
+            db.add(
+                Activity(
+                    application_id=application.id,
+                    event_type="created",
+                    description=f"Added {application.role} at {application.company}",
+                    new_value=application.status.value,
+                    created_at=application.created_at,
+                )
+            )
+        db.commit()
+
+
 def prepare_database() -> None:
     Base.metadata.create_all(bind=engine)
     upgrade_v1_database()
     seed_database()
+    backfill_activity_history()
 
 
 @asynccontextmanager
@@ -160,6 +183,13 @@ def health_check(db: Session = Depends(get_db)) -> dict[str, str]:
 
 def token_for(user: User) -> TokenRead:
     return TokenRead(access_token=create_access_token(user.id), user=UserRead.model_validate(user))
+
+
+def application_payload(payload: ApplicationCreate | ApplicationUpdate, *, exclude_unset: bool = False) -> dict[str, object]:
+    data = payload.model_dump(exclude_unset=exclude_unset, mode="python")
+    if data.get("job_url") is not None:
+        data["job_url"] = str(data["job_url"])
+    return data
 
 
 @app.post("/api/auth/register", response_model=TokenRead, status_code=status.HTTP_201_CREATED)
@@ -216,10 +246,19 @@ def create_application(
     current_user: User = Depends(get_current_user),
 ) -> Application:
     application = Application(
-        **payload.model_dump(mode="json"),
+        **application_payload(payload),
         user_id=current_user.id,
     )
     db.add(application)
+    db.flush()
+    db.add(
+        Activity(
+            application_id=application.id,
+            event_type="created",
+            description=f"Added {application.role} at {application.company}",
+            new_value=application.status.value,
+        )
+    )
     db.commit()
     db.refresh(application)
     return application
@@ -235,6 +274,41 @@ def find_application(application_id: int, user_id: int, db: Session) -> Applicat
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
     return application
+
+
+def serialise_activity_value(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, ApplicationStatus):
+        return value.value
+    if hasattr(value, "isoformat"):
+        return value.isoformat()  # type: ignore[union-attr]
+    return str(value)
+
+
+def describe_field_changes(changes: list[tuple[str, str | None, str | None]]) -> str:
+    labels = {
+        "company": "company",
+        "role": "role",
+        "location": "location",
+        "salary": "salary",
+        "job_url": "job URL",
+        "deadline": "deadline",
+        "notes": "notes",
+        "job_description": "job description",
+        "match_score": "match score",
+    }
+    if len(changes) == 1:
+        field, old_value, new_value = changes[0]
+        if field == "deadline":
+            return f"Changed deadline from {old_value or 'not set'} to {new_value or 'not set'}"
+        if field == "notes":
+            return "Updated personal notes"
+        if field == "job_description":
+            return "Updated the job description"
+        return f"Updated {labels.get(field, field.replace('_', ' '))}"
+    changed_labels = ", ".join(labels.get(field, field.replace("_", " ")) for field, _, _ in changes)
+    return f"Updated application details: {changed_labels}"
 
 
 @app.get("/api/applications/{application_id}", response_model=ApplicationRead)
@@ -254,11 +328,60 @@ def update_application(
     current_user: User = Depends(get_current_user),
 ) -> Application:
     application = find_application(application_id, current_user.id, db)
-    for field, value in payload.model_dump(exclude_unset=True, mode="json").items():
+    field_changes: list[tuple[str, str | None, str | None]] = []
+    status_change: tuple[str | None, str | None] | None = None
+    for field, value in application_payload(payload, exclude_unset=True).items():
+        old_value = serialise_activity_value(getattr(application, field))
+        new_value = serialise_activity_value(value)
+        if old_value == new_value:
+            continue
+        if field == "status":
+            status_change = (old_value, new_value)
+        else:
+            field_changes.append((field, old_value, new_value))
         setattr(application, field, value)
+
+    if status_change is not None:
+        old_status, new_status = status_change
+        old_label = (old_status or "unknown").replace("_", " ").title()
+        new_label = (new_status or "unknown").replace("_", " ").title()
+        db.add(
+            Activity(
+                application_id=application.id,
+                event_type="status_changed",
+                description=f"Moved from {old_label} to {new_label}",
+                old_value=old_status,
+                new_value=new_status,
+            )
+        )
+    if field_changes:
+        db.add(
+            Activity(
+                application_id=application.id,
+                event_type="details_updated",
+                description=describe_field_changes(field_changes),
+                old_value=" | ".join(value or "" for _, value, _ in field_changes),
+                new_value=" | ".join(value or "" for _, _, value in field_changes),
+            )
+        )
     db.commit()
     db.refresh(application)
     return application
+
+
+@app.get("/api/applications/{application_id}/activities", response_model=list[ActivityRead])
+def list_activities(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[Activity]:
+    application = find_application(application_id, current_user.id, db)
+    statement = (
+        select(Activity)
+        .where(Activity.application_id == application.id)
+        .order_by(Activity.created_at.desc(), Activity.id.desc())
+    )
+    return list(db.scalars(statement).all())
 
 
 @app.delete("/api/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)

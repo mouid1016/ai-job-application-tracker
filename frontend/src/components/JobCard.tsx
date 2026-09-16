@@ -3,6 +3,7 @@ import { Icon } from "./Icon";
 
 interface JobCardProps {
   application: JobApplication;
+  onOpen: (application: JobApplication) => void;
   onDelete: (id: number) => void;
   onDragStart: (id: number) => void;
 }
@@ -23,19 +24,23 @@ function formatDeadline(deadline: string | null) {
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(new Date(`${deadline}T00:00:00`));
 }
 
-export function JobCard({ application, onDelete, onDragStart }: JobCardProps) {
+export function JobCard({ application, onOpen, onDelete, onDragStart }: JobCardProps) {
   return (
     <article
       className="job-card"
       draggable
       onDragStart={() => onDragStart(application.id)}
+      onClick={() => onOpen(application)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onOpen(application);
+      }}
       tabIndex={0}
     >
       <div className="card-top">
         <span className="company-logo" style={{ background: companyColor(application.company) }}>
           {initials(application.company)}
         </span>
-        <button className="icon-button delete-button" onClick={() => onDelete(application.id)} aria-label={`Delete ${application.company} application`}>
+        <button className="icon-button delete-button" onClick={(event) => { event.stopPropagation(); onDelete(application.id); }} aria-label={`Delete ${application.company} application`}>
           <Icon name="trash" size={16} />
         </button>
       </div>
@@ -51,4 +56,3 @@ export function JobCard({ application, onDelete, onDragStart }: JobCardProps) {
     </article>
   );
 }
-
