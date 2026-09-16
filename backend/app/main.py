@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import Base, SessionLocal, engine, get_db
 from .document_service import document_path, read_upload, remove_document, store_document
-from .models import Activity, Application, ApplicationStatus, Document, User
+from .ai_service import analyse_match, description_hash
+from .models import AIAnalysis, Activity, Application, ApplicationStatus, Document, User
 from .schemas import (
+    AIAnalysisRead,
     ActivityRead,
     ApplicationCreate,
     ApplicationRead,
@@ -163,7 +165,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.3.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.4.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -367,6 +369,8 @@ def update_application(
                 new_value=" | ".join(value or "" for _, _, value in field_changes),
             )
         )
+    if any(field == "job_description" for field, _, _ in field_changes):
+        application.match_score = None
     db.commit()
     db.refresh(application)
     return application
@@ -422,6 +426,7 @@ async def upload_cv(
     original_filename, content_type, content, extracted_text = await read_upload(file)
     stored_filename = store_document(content, content_type)
     previous = find_cv(application_id, current_user.id, db)
+    application.match_score = None
 
     try:
         if previous is not None:
@@ -499,6 +504,7 @@ def delete_cv(
         raise HTTPException(status_code=404, detail="CV not found")
     stored_filename = document.stored_filename
     original_filename = document.original_filename
+    application.match_score = None
     db.delete(document)
     db.add(
         Activity(
@@ -511,6 +517,120 @@ def delete_cv(
     db.commit()
     remove_document(stored_filename)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def find_analysis(application_id: int, user_id: int, db: Session) -> AIAnalysis | None:
+    return db.scalar(
+        select(AIAnalysis).where(
+            AIAnalysis.application_id == application_id,
+            AIAnalysis.user_id == user_id,
+        )
+    )
+
+
+def analysis_response(
+    analysis: AIAnalysis,
+    application: Application,
+    document: Document | None,
+) -> AIAnalysisRead:
+    current_hash = description_hash(application.job_description or "")
+    cv_changed = (
+        document is None
+        or document.uploaded_at.replace(tzinfo=None)
+        != analysis.source_cv_uploaded_at.replace(tzinfo=None)
+    )
+    return AIAnalysisRead(
+        id=analysis.id,
+        application_id=analysis.application_id,
+        match_score=analysis.match_score,
+        skill_coverage=analysis.skill_coverage,
+        matching_skills=analysis.matching_skills,
+        missing_skills=analysis.missing_skills,
+        cv_skills=analysis.cv_skills,
+        job_skills=analysis.job_skills,
+        strengths=analysis.strengths,
+        recommendations=analysis.recommendations,
+        summary=analysis.summary,
+        provider=analysis.provider,
+        model=analysis.model,
+        is_stale=cv_changed or current_hash != analysis.source_job_description_hash,
+        created_at=analysis.created_at,
+        updated_at=analysis.updated_at,
+    )
+
+
+@app.get("/api/applications/{application_id}/analysis", response_model=AIAnalysisRead | None)
+def get_analysis(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AIAnalysisRead | None:
+    application = find_application(application_id, current_user.id, db)
+    analysis = find_analysis(application_id, current_user.id, db)
+    if analysis is None:
+        return None
+    return analysis_response(
+        analysis,
+        application,
+        find_cv(application_id, current_user.id, db),
+    )
+
+
+@app.post("/api/applications/{application_id}/analysis", response_model=AIAnalysisRead)
+def run_analysis(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AIAnalysisRead:
+    application = find_application(application_id, current_user.id, db)
+    if not application.job_description or not application.job_description.strip():
+        raise HTTPException(status_code=422, detail="Add and save a job description before running analysis")
+    document = find_cv(application_id, current_user.id, db)
+    if document is None or not document.extracted_text.strip():
+        raise HTTPException(status_code=422, detail="Upload a readable CV before running analysis")
+
+    result = analyse_match(document.extracted_text, application.job_description)
+    analysis = find_analysis(application_id, current_user.id, db)
+    values = {
+        "match_score": result.match_score,
+        "skill_coverage": result.skill_coverage,
+        "matching_skills": result.matching_skills,
+        "missing_skills": result.missing_skills,
+        "cv_skills": result.cv_skills,
+        "job_skills": result.job_skills,
+        "strengths": result.strengths,
+        "recommendations": result.recommendations,
+        "summary": result.summary,
+        "provider": result.provider,
+        "model": result.model,
+        "source_cv_uploaded_at": document.uploaded_at,
+        "source_job_description_hash": description_hash(application.job_description),
+    }
+    if analysis is None:
+        analysis = AIAnalysis(
+            application_id=application.id,
+            user_id=current_user.id,
+            **values,
+        )
+        db.add(analysis)
+    else:
+        for field, value in values.items():
+            setattr(analysis, field, value)
+
+    old_score = application.match_score
+    application.match_score = result.match_score
+    db.add(
+        Activity(
+            application_id=application.id,
+            event_type="analysis_completed",
+            description=f"Analysed CV against job description: {result.match_score}% match",
+            old_value=str(old_score) if old_score is not None else None,
+            new_value=str(result.match_score),
+        )
+    )
+    db.commit()
+    db.refresh(analysis)
+    return analysis_response(analysis, application, document)
 
 
 @app.delete("/api/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)

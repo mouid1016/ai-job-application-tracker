@@ -203,6 +203,42 @@ button { cursor: pointer; }
 .cv-upload-button input { display: none; }
 .cv-upload-button .spinner { width: 13px; height: 13px; border-width: 2px; }
 .cv-loading { min-height: 70px; display: grid; place-items: center; }
+.analysis-section { margin: 22px 0 5px; padding: 19px; border: 1px solid #ddd8ff; border-radius: 13px; background: linear-gradient(145deg, #fbfaff, #f5f3ff); }
+.analysis-heading, .analysis-title, .analysis-overview { display: flex; align-items: center; }
+.analysis-heading { justify-content: space-between; gap: 12px; }
+.analysis-title { gap: 10px; }
+.analysis-title > span { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 9px; color: #6558d8; background: #e9e6ff; }
+.analysis-title h3, .analysis-title p { margin: 0; }
+.analysis-title h3 { font: 800 13px "Manrope", sans-serif; }
+.analysis-title p { margin-top: 3px; color: #9996a7; font-size: 9px; }
+.analysis-provider { padding: 5px 8px; border-radius: 6px; color: #5d51d5; background: #e9e6ff; font-size: 8px; font-weight: 800; }
+.analysis-loading { min-height: 150px; display: grid; place-items: center; }
+.analysis-results { margin-top: 17px; }
+.analysis-stale { margin-bottom: 14px; padding: 9px 11px; border: 1px solid #efd9a9; border-radius: 8px; color: #8a621e; background: #fff8e8; font-size: 9px; line-height: 1.5; }
+.analysis-overview { gap: 16px; padding: 14px; border-radius: 10px; background: rgba(255,255,255,.8); }
+.analysis-overview > div:last-child { min-width: 0; }
+.analysis-overview > div:last-child > strong { color: #454250; font-size: 11px; }
+.analysis-overview p { margin: 5px 0 0; color: #888594; font-size: 9px; line-height: 1.55; }
+.score-ring { --score: 0deg; width: 76px; height: 76px; flex: 0 0 auto; display: grid; place-content: center; border-radius: 50%; text-align: center; background: radial-gradient(circle at center, #fff 60%, transparent 62%), conic-gradient(#6558d8 var(--score), #e8e5f4 0); }
+.score-ring strong, .score-ring span { display: block; }
+.score-ring strong { color: #312d50; font: 800 19px "Manrope", sans-serif; }
+.score-ring span { color: #9a97a6; font-size: 8px; text-transform: uppercase; letter-spacing: .7px; }
+.skill-columns, .analysis-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 13px; }
+.skill-columns > div, .analysis-notes > div { padding: 13px; border: 1px solid #e8e5f1; border-radius: 9px; background: rgba(255,255,255,.75); }
+.skill-columns h4, .analysis-notes h4 { margin: 0 0 9px; color: #5b5867; font-size: 9px; text-transform: uppercase; letter-spacing: .6px; }
+.skill-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.skill-tags span { padding: 5px 7px; border-radius: 6px; font-size: 8.5px; font-weight: 700; }
+.skill-tags .matched { color: #19785f; background: #e5f7f1; }
+.skill-tags .missing { color: #9a611c; background: #fff0d9; }
+.skill-tags em { color: #aaa7b4; font-size: 9px; font-style: normal; }
+.analysis-notes ul { display: grid; gap: 7px; margin: 0; padding-left: 15px; color: #777482; font-size: 9px; line-height: 1.45; }
+.analysis-empty { margin: 16px 0 0; padding: 20px; border: 1px dashed #d7d2f3; border-radius: 10px; text-align: center; background: rgba(255,255,255,.55); }
+.analysis-empty strong { color: #565267; font-size: 11px; }
+.analysis-empty p { max-width: 420px; margin: 6px auto 0; color: #9996a7; font-size: 9px; line-height: 1.5; }
+.analysis-button { min-height: 39px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 13px; padding: 0 14px; border: 0; border-radius: 8px; color: #fff; background: #6558d8; box-shadow: 0 6px 15px rgba(101,88,216,.2); font-size: 10px; font-weight: 800; }
+.analysis-button:hover:not(:disabled) { background: #564ac7; }
+.analysis-button:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
+.analysis-button .spinner { width: 13px; height: 13px; border-width: 2px; border-top-color: #fff; }
 .detail-textarea-label { display: grid; gap: 7px; margin-top: 15px; color: #5d5b67; font-size: 11px; font-weight: 700; }
 .detail-textarea-label textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #e1e0e8; border-radius: 9px; outline: 0; color: #2c2b34; background: #fbfbfd; font-size: 12px; line-height: 1.55; }
 .detail-textarea-label textarea:focus { border-color: #958cf0; background: #fff; box-shadow: 0 0 0 3px rgba(101,88,232,.08); }
@@ -218,6 +254,7 @@ button { cursor: pointer; }
 .activity-list li.created .activity-icon { color: #238568; border-color: #d1eee5; background: #eaf8f3; }
 .activity-list li.cv_uploaded .activity-icon, .activity-list li.cv_replaced .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
 .activity-list li.cv_removed .activity-icon { color: #a54752; border-color: #f0cfd3; background: #fff0f2; }
+.activity-list li.analysis_completed .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
 .activity-list strong, .activity-list time { display: block; }
 .activity-list strong { padding-top: 2px; color: #4a4855; font-size: 10.5px; line-height: 1.4; }
 .activity-list time { margin-top: 5px; color: #aaa8b3; font-size: 9px; }
@@ -259,6 +296,7 @@ button { cursor: pointer; }
   .detail-form, .activity-panel { overflow: visible; padding: 22px 20px; }
   .activity-panel { border-top: 1px solid var(--border); border-left: 0; }
   .detail-actions { position: sticky; bottom: 0; margin-inline: -20px; padding: 13px 20px; border-top: 1px solid var(--border); background: rgba(255,255,255,.95); }
+  .skill-columns, .analysis-notes { grid-template-columns: 1fr; }
 }
 
 @media (min-width: 761px) and (max-width: 980px) {

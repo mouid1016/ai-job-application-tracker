@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7
     upload_dir: str = "./uploads"
     max_upload_size_mb: int = 5
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-6-astra"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -134,3 +134,22 @@ class DocumentRead(BaseModel):
             extraction_status=document.extraction_status,
             uploaded_at=document.uploaded_at,
         )
+
+
+class AIAnalysisRead(BaseModel):
+    id: int
+    application_id: int
+    match_score: int
+    skill_coverage: int
+    matching_skills: list[str]
+    missing_skills: list[str]
+    cv_skills: list[str]
+    job_skills: list[str]
+    strengths: list[str]
+    recommendations: list[str]
+    summary: str
+    provider: str
+    model: str | None
+    is_stale: bool
+    created_at: datetime
+    updated_at: datetime
