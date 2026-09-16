@@ -4,6 +4,7 @@ import type {
   ApplicationStatus,
   ApplicationUpdate,
   AuthResponse,
+  CvDocument,
   DashboardStats,
   JobApplication,
   LoginCredentials,
@@ -20,10 +21,11 @@ function getToken() {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken();
+  const isFormData = options?.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(!isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options?.headers,
     },
@@ -39,6 +41,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+async function download(path: string): Promise<Blob> {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail ?? `Download failed with status ${response.status}`);
+  }
+  return response.blob();
 }
 
 function storeSession(response: AuthResponse) {
@@ -67,6 +81,17 @@ export const api = {
   listApplications: () => request<JobApplication[]>("/applications"),
   getApplication: (id: number) => request<JobApplication>(`/applications/${id}`),
   listActivities: (id: number) => request<Activity[]>(`/applications/${id}/activities`),
+  getCv: (id: number) => request<CvDocument | null>(`/applications/${id}/documents/cv`),
+  uploadCv: (id: number, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<CvDocument>(`/applications/${id}/documents/cv`, {
+      method: "POST",
+      body: form,
+    });
+  },
+  downloadCv: (id: number) => download(`/applications/${id}/documents/cv/download`),
+  deleteCv: (id: number) => request<void>(`/applications/${id}/documents/cv`, { method: "DELETE" }),
   getStats: () => request<DashboardStats>("/stats"),
   createApplication: (payload: ApplicationCreate) =>
     request<JobApplication>("/applications", {

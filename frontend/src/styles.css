@@ -180,6 +180,29 @@ button { cursor: pointer; }
 .detail-status.offer { color: #19785f; background: #e5f7f1; }
 .detail-status.rejected { color: #a54752; background: #ffebed; }
 .detail-fields { margin-bottom: 18px; }
+.cv-section { margin: 4px 0 21px; padding: 17px; border: 1px solid #e4e2ec; border-radius: 12px; background: #fafafd; }
+.cv-section .detail-section-heading { margin-bottom: 13px; }
+.cv-section .detail-section-heading h3 { font-size: 13px; }
+.cv-section .detail-section-heading p { margin: 3px 0 0; color: #aaa8b4; font-size: 9px; }
+.extraction-badge { width: auto !important; height: auto !important; padding: 5px 8px; color: #19785f !important; background: #e5f7f1 !important; white-space: nowrap; }
+.cv-file, .cv-empty { display: flex; align-items: center; gap: 11px; padding: 13px; border: 1px solid #e5e3ec; border-radius: 10px; background: #fff; }
+.cv-file-icon { width: 39px; height: 39px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 9px; color: #6558d8; background: #eeecff; }
+.cv-file-copy { min-width: 0; flex: 1; }
+.cv-file-copy strong, .cv-file-copy span, .cv-empty strong { display: block; }
+.cv-file-copy strong { overflow: hidden; color: #43414d; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.cv-file-copy span { margin-top: 4px; color: #9a98a5; font-size: 9px; }
+.cv-empty > div { min-width: 0; flex: 1; }
+.cv-empty strong { color: #555260; font-size: 11px; }
+.cv-empty p { margin: 4px 0 0; color: #9a98a5; font-size: 9px; line-height: 1.4; }
+.cv-icon-button { width: 34px; height: 34px; display: grid; flex: 0 0 auto; place-items: center; border: 1px solid #e1dfe9; border-radius: 8px; color: #686572; background: #fff; }
+.cv-icon-button:hover { color: #5d51d5; border-color: #bcb6f3; }
+.cv-icon-button.danger:hover { color: #b34250; border-color: #efc0c5; background: #fff7f8; }
+.cv-upload-button { width: max-content; min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 7px; margin-top: 11px; padding: 0 12px; border: 1px solid #d8d4f7; border-radius: 8px; color: #5d51d5; background: #f5f3ff; cursor: pointer; font-size: 10px; font-weight: 800; }
+.cv-upload-button:hover { border-color: #aaa2f4; background: #eeebff; }
+.cv-upload-button.disabled { opacity: .65; cursor: wait; }
+.cv-upload-button input { display: none; }
+.cv-upload-button .spinner { width: 13px; height: 13px; border-width: 2px; }
+.cv-loading { min-height: 70px; display: grid; place-items: center; }
 .detail-textarea-label { display: grid; gap: 7px; margin-top: 15px; color: #5d5b67; font-size: 11px; font-weight: 700; }
 .detail-textarea-label textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #e1e0e8; border-radius: 9px; outline: 0; color: #2c2b34; background: #fbfbfd; font-size: 12px; line-height: 1.55; }
 .detail-textarea-label textarea:focus { border-color: #958cf0; background: #fff; box-shadow: 0 0 0 3px rgba(101,88,232,.08); }
@@ -193,6 +216,8 @@ button { cursor: pointer; }
 .activity-icon { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #e2e0ea; border-radius: 9px; color: #777286; background: #fff; }
 .activity-list li.status_changed .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
 .activity-list li.created .activity-icon { color: #238568; border-color: #d1eee5; background: #eaf8f3; }
+.activity-list li.cv_uploaded .activity-icon, .activity-list li.cv_replaced .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
+.activity-list li.cv_removed .activity-icon { color: #a54752; border-color: #f0cfd3; background: #fff0f2; }
 .activity-list strong, .activity-list time { display: block; }
 .activity-list strong { padding-top: 2px; color: #4a4855; font-size: 10.5px; line-height: 1.4; }
 .activity-list time { margin-top: 5px; color: #aaa8b3; font-size: 9px; }

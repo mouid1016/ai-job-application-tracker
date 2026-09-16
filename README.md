@@ -1,6 +1,6 @@
 # AI Job Application Tracker
 
-A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, per-user data isolation, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
+A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
 
 ## Quick start (recommended)
 
@@ -91,6 +91,7 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 - Create, edit and delete applications
 - Full application workspace with notes and job-description storage
 - Automatic activity timeline for status and detail changes
+- Private PDF/DOCX CV upload, replacement, download, deletion, and text extraction
 - Search by company or role
 - FastAPI CRUD endpoints with automatic Swagger docs
 - PostgreSQL in Docker and SQLite for quick local development
@@ -110,6 +111,10 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `PATCH` | `/api/applications/{id}` | Update an application or status |
 | `DELETE` | `/api/applications/{id}` | Delete an application |
 | `GET` | `/api/applications/{id}/activities` | Read an application's activity timeline |
+| `GET` | `/api/applications/{id}/documents/cv` | Read CV metadata |
+| `POST` | `/api/applications/{id}/documents/cv` | Upload or replace a PDF/DOCX CV |
+| `GET` | `/api/applications/{id}/documents/cv/download` | Download the authenticated user's CV |
+| `DELETE` | `/api/applications/{id}/documents/cv` | Remove a CV |
 | `GET` | `/api/stats` | Dashboard statistics |
 
 ## Project structure
@@ -142,8 +147,7 @@ ai-job-application-tracker/
 
 ## Next milestones
 
-1. CV upload and document text extraction
-2. Structured AI skill extraction and deterministic match scoring
-3. Cover letters and interview questions
-4. Automated tests, Alembic migrations, and CI
-5. Deployment and a public demo environment
+1. Structured AI skill extraction and deterministic match scoring
+2. Cover letters and interview questions
+3. Automated tests, Alembic migrations, and CI
+4. Deployment and a public demo environment

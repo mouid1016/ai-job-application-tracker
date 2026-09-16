@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     seed_demo_data: bool = True
     secret_key: str = "development-only-secret-key-change-me"
     access_token_expire_minutes: int = 60 * 24 * 7
+    upload_dir: str = "./uploads"
+    max_upload_size_mb: int = 5
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

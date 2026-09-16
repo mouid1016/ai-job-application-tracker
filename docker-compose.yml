@@ -23,6 +23,10 @@ services:
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
       SECRET_KEY: ${SECRET_KEY:-development-only-secret-key-change-me}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-5}
+    volumes:
+      - cv_uploads:/app/uploads
     ports:
       - "8000:8000"
     depends_on:
@@ -39,3 +43,4 @@ services:
 
 volumes:
   postgres_data:
+  cv_uploads:
