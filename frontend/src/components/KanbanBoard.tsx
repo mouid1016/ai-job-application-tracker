@@ -4,6 +4,7 @@ import { JobCard } from "./JobCard";
 
 interface KanbanBoardProps {
   applications: JobApplication[];
+  onOpen: (application: JobApplication) => void;
   onMove: (id: number, status: ApplicationStatus) => void;
   onDelete: (id: number) => void;
 }
@@ -17,7 +18,7 @@ const labels: Record<ApplicationStatus, string> = {
   rejected: "Rejected",
 };
 
-export function KanbanBoard({ applications, onMove, onDelete }: KanbanBoardProps) {
+export function KanbanBoard({ applications, onOpen, onMove, onDelete }: KanbanBoardProps) {
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<ApplicationStatus | null>(null);
 
@@ -49,6 +50,7 @@ export function KanbanBoard({ applications, onMove, onDelete }: KanbanBoardProps
                 <JobCard
                   key={application.id}
                   application={application}
+                  onOpen={onOpen}
                   onDelete={onDelete}
                   onDragStart={setDraggedId}
                 />
@@ -61,4 +63,3 @@ export function KanbanBoard({ applications, onMove, onDelete }: KanbanBoardProps
     </section>
   );
 }
-

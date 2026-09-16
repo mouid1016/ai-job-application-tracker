@@ -98,3 +98,15 @@ class TokenRead(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserRead
+
+
+class ActivityRead(BaseModel):
+    id: int
+    application_id: int
+    event_type: str
+    description: str
+    old_value: str | None
+    new_value: str | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

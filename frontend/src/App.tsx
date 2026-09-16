@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { AddApplicationModal } from "./components/AddApplicationModal";
+import { ApplicationDetailModal } from "./components/ApplicationDetailModal";
 import { AuthPage } from "./components/AuthPage";
 import { Icon } from "./components/Icon";
 import { KanbanBoard } from "./components/KanbanBoard";
@@ -25,6 +26,7 @@ export default function App() {
   const [stats, setStats] = useState<DashboardStats>(emptyStats);
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,11 @@ export default function App() {
     if (!query) return applications;
     return applications.filter((job) => `${job.company} ${job.role} ${job.location ?? ""}`.toLowerCase().includes(query));
   }, [applications, search]);
+
+  const selectedApplication = useMemo(
+    () => applications.find((application) => application.id === selectedApplicationId) ?? null,
+    [applications, selectedApplicationId],
+  );
 
   async function login(credentials: LoginCredentials) {
     const authenticatedUser = await api.login(credentials);
@@ -131,6 +138,13 @@ export default function App() {
     }
   }
 
+  function applicationSaved(updated: JobApplication) {
+    setApplications((current) => current.map((application) => application.id === updated.id ? updated : application));
+    void api.getStats().then(setStats).catch(() => undefined);
+  }
+
+  const closeApplicationDetails = useCallback(() => setSelectedApplicationId(null), []);
+
   if (authLoading) {
     return <div className="app-loading"><span className="brand-mark"><Icon name="briefcase" size={20} /></span><span className="spinner" /></div>;
   }
@@ -164,12 +178,20 @@ export default function App() {
                 <div><h2>Application pipeline</h2><p>Drag cards between columns as you make progress.</p></div>
                 <label className="search-box"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search company or role" aria-label="Search applications" /></label>
               </div>
-              <KanbanBoard applications={filtered} onMove={moveApplication} onDelete={deleteApplication} />
+              <KanbanBoard applications={filtered} onOpen={(application) => setSelectedApplicationId(application.id)} onMove={moveApplication} onDelete={deleteApplication} />
             </section>
           </>
         )}
       </main>
       <AddApplicationModal open={modalOpen} saving={saving} onClose={() => setModalOpen(false)} onSubmit={addApplication} />
+      {selectedApplication && (
+        <ApplicationDetailModal
+          key={selectedApplication.id}
+          application={selectedApplication}
+          onClose={closeApplicationDetails}
+          onSaved={applicationSaved}
+        />
+      )}
     </div>
   );
 }

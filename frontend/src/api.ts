@@ -1,6 +1,8 @@
 import type {
+  Activity,
   ApplicationCreate,
   ApplicationStatus,
+  ApplicationUpdate,
   AuthResponse,
   DashboardStats,
   JobApplication,
@@ -63,6 +65,8 @@ export const api = {
     ),
   getMe: () => request<User>("/auth/me"),
   listApplications: () => request<JobApplication[]>("/applications"),
+  getApplication: (id: number) => request<JobApplication>(`/applications/${id}`),
+  listActivities: (id: number) => request<Activity[]>(`/applications/${id}/activities`),
   getStats: () => request<DashboardStats>("/stats"),
   createApplication: (payload: ApplicationCreate) =>
     request<JobApplication>("/applications", {
@@ -73,6 +77,11 @@ export const api = {
     request<JobApplication>(`/applications/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+  updateApplication: (id: number, payload: ApplicationUpdate) =>
+    request<JobApplication>(`/applications/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     }),
   deleteApplication: (id: number) =>
     request<void>(`/applications/${id}`, { method: "DELETE" }),

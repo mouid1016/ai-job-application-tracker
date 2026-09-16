@@ -88,7 +88,9 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 - Per-user application ownership and API-level data isolation
 - Responsive Kanban workflow: Saved → Applied → Assessment → Interview → Offer → Rejected
 - Native drag-and-drop status updates
-- Create and delete applications
+- Create, edit and delete applications
+- Full application workspace with notes and job-description storage
+- Automatic activity timeline for status and detail changes
 - Search by company or role
 - FastAPI CRUD endpoints with automatic Swagger docs
 - PostgreSQL in Docker and SQLite for quick local development
@@ -107,6 +109,7 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `GET` | `/api/applications/{id}` | Read one application |
 | `PATCH` | `/api/applications/{id}` | Update an application or status |
 | `DELETE` | `/api/applications/{id}` | Delete an application |
+| `GET` | `/api/applications/{id}/activities` | Read an application's activity timeline |
 | `GET` | `/api/stats` | Dashboard statistics |
 
 ## Project structure
@@ -139,8 +142,8 @@ ai-job-application-tracker/
 
 ## Next milestones
 
-1. Full application detail page and activity timeline
-2. CV upload and job-description storage
-3. Structured AI skill extraction and deterministic match scoring
-4. Cover letters and interview questions
-5. Automated tests, Alembic migrations, and CI
+1. CV upload and document text extraction
+2. Structured AI skill extraction and deterministic match scoring
+3. Cover letters and interview questions
+4. Automated tests, Alembic migrations, and CI
+5. Deployment and a public demo environment

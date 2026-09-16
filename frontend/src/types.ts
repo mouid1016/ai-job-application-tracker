@@ -36,6 +36,29 @@ export interface ApplicationCreate {
   notes?: string;
 }
 
+export interface ApplicationUpdate {
+  company?: string;
+  role?: string;
+  location?: string | null;
+  status?: ApplicationStatus;
+  salary?: string | null;
+  job_url?: string | null;
+  deadline?: string | null;
+  notes?: string | null;
+  job_description?: string | null;
+  match_score?: number | null;
+}
+
+export interface Activity {
+  id: number;
+  application_id: number;
+  event_type: "created" | "status_changed" | "details_updated" | string;
+  description: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+}
+
 export interface DashboardStats {
   total: number;
   active: number;
