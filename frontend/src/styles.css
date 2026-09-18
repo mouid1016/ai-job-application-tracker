@@ -239,6 +239,32 @@ button { cursor: pointer; }
 .analysis-button:hover:not(:disabled) { background: #564ac7; }
 .analysis-button:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
 .analysis-button .spinner { width: 13px; height: 13px; border-width: 2px; border-top-color: #fff; }
+.kit-section { margin: 18px 0 5px; padding: 19px; border: 1px solid #d9e6f5; border-radius: 13px; background: linear-gradient(145deg, #fbfdff, #f2f7fc); }
+.kit-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.kit-results { display: grid; gap: 12px; margin-top: 17px; }
+.kit-card { padding: 14px; border: 1px solid #e1e8f0; border-radius: 10px; background: rgba(255,255,255,.88); }
+.kit-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.kit-card-heading h4 { margin: 0; color: #4d5260; font-size: 10px; text-transform: uppercase; letter-spacing: .65px; }
+.kit-card-heading button { min-height: 27px; padding: 0 9px; border: 1px solid #d9d7ef; border-radius: 6px; color: #5d51d5; background: #f6f4ff; font-size: 8.5px; font-weight: 800; }
+.kit-card-heading button:hover { border-color: #aaa2f4; background: #efecff; }
+.kit-card-heading > span { color: #8d899a; font-size: 9px; font-weight: 800; }
+.kit-card > p, .cover-letter-copy { margin: 0; color: #666472; font-size: 10px; line-height: 1.65; }
+.cover-letter-copy { white-space: pre-wrap; }
+.interview-list { display: grid; gap: 7px; }
+.interview-list details { border: 1px solid #e7e6ed; border-radius: 8px; background: #fff; }
+.interview-list summary { display: flex; align-items: center; gap: 9px; padding: 11px; color: #514e5c; cursor: pointer; font-size: 10px; font-weight: 700; line-height: 1.4; list-style: none; }
+.interview-list summary::-webkit-details-marker { display: none; }
+.interview-list summary > span { width: 21px; height: 21px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 6px; color: #5d51d5; background: #eeecff; font-size: 8px; }
+.interview-answer { padding: 0 12px 12px 41px; color: #777482; font-size: 9px; line-height: 1.55; }
+.interview-answer p { margin: 0 0 8px; }
+.interview-answer > strong { color: #5c5966; }
+.interview-answer ul, .employer-questions { display: grid; gap: 6px; margin: 6px 0 0; padding-left: 17px; }
+.employer-questions { color: #666472; font-size: 10px; line-height: 1.55; }
+.kit-button { min-height: 39px; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 13px; padding: 0 14px; border: 0; border-radius: 8px; color: #fff; background: #287b8f; box-shadow: 0 6px 15px rgba(40,123,143,.2); font-size: 10px; font-weight: 800; }
+.kit-button:hover:not(:disabled) { background: #206b7c; }
+.kit-button:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.kit-button .spinner { width: 13px; height: 13px; border-width: 2px; border-top-color: #fff; }
+.kit-requirement { margin: 8px 0 0; color: #9996a7; font-size: 8.5px; }
 .detail-textarea-label { display: grid; gap: 7px; margin-top: 15px; color: #5d5b67; font-size: 11px; font-weight: 700; }
 .detail-textarea-label textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #e1e0e8; border-radius: 9px; outline: 0; color: #2c2b34; background: #fbfbfd; font-size: 12px; line-height: 1.55; }
 .detail-textarea-label textarea:focus { border-color: #958cf0; background: #fff; box-shadow: 0 0 0 3px rgba(101,88,232,.08); }
@@ -254,7 +280,7 @@ button { cursor: pointer; }
 .activity-list li.created .activity-icon { color: #238568; border-color: #d1eee5; background: #eaf8f3; }
 .activity-list li.cv_uploaded .activity-icon, .activity-list li.cv_replaced .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
 .activity-list li.cv_removed .activity-icon { color: #a54752; border-color: #f0cfd3; background: #fff0f2; }
-.activity-list li.analysis_completed .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
+.activity-list li.analysis_completed .activity-icon, .activity-list li.application_kit_generated .activity-icon { color: #6558d8; border-color: #ddd8ff; background: #f2f0ff; }
 .activity-list strong, .activity-list time { display: block; }
 .activity-list strong { padding-top: 2px; color: #4a4855; font-size: 10.5px; line-height: 1.4; }
 .activity-list time { margin-top: 5px; color: #aaa8b3; font-size: 9px; }

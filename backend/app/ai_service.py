@@ -98,6 +98,20 @@ class StructuredSkillAnalysis(BaseModel):
     summary: str
 
 
+class InterviewQuestion(BaseModel):
+    question: str
+    why_asked: str
+    answer_framework: str
+    talking_points: list[str]
+
+
+class StructuredApplicationKit(BaseModel):
+    cover_letter: str
+    elevator_pitch: str
+    interview_questions: list[InterviewQuestion]
+    questions_to_ask: list[str]
+
+
 @dataclass
 class AnalysisResult:
     match_score: int
@@ -109,6 +123,16 @@ class AnalysisResult:
     strengths: list[str]
     recommendations: list[str]
     summary: str
+    provider: str
+    model: str | None
+
+
+@dataclass
+class ApplicationKitResult:
+    cover_letter: str
+    elevator_pitch: str
+    interview_questions: list[dict[str, object]]
+    questions_to_ask: list[str]
     provider: str
     model: str | None
 
@@ -239,6 +263,165 @@ def analyse_match(cv_text: str, job_description: str) -> AnalysisResult:
         strengths=extracted.strengths[:5],
         recommendations=extracted.recommendations[:5],
         summary=extracted.summary,
+        provider=provider,
+        model=model,
+    )
+
+
+def local_application_kit(
+    candidate_name: str,
+    company: str,
+    role: str,
+    matching_skills: list[str],
+    missing_skills: list[str],
+) -> StructuredApplicationKit:
+    skills = matching_skills[:4]
+    skills_text = ", ".join(skills) if skills else "relevant transferable experience"
+    first_skill = skills[0] if skills else "problem solving"
+    development_skill = missing_skills[0] if missing_skills else "a new technology"
+    cover_letter = (
+        "Dear Hiring Team,\n\n"
+        f"I am writing to apply for the {role} position at {company}. The opportunity stands out to me "
+        "because it combines practical delivery with the chance to contribute to a strong engineering team.\n\n"
+        f"My CV demonstrates experience with {skills_text}. I would bring this foundation to the role while "
+        "continuing to learn the tools and domain knowledge that matter most to your team. I take a structured "
+        "approach to solving problems, communicate clearly, and focus on producing reliable work.\n\n"
+        f"I would welcome the opportunity to discuss how my experience and motivation could support {company}. "
+        "Thank you for considering my application.\n\n"
+        f"Kind regards,\n{candidate_name}"
+    )
+    elevator_pitch = (
+        f"I'm {candidate_name}, and I'm applying for the {role} role at {company}. My background includes "
+        f"{skills_text}, and I enjoy turning requirements into clear, reliable solutions. I'm particularly "
+        "interested in this opportunity because it would let me contribute those strengths while growing with the team."
+    )
+    questions = [
+        InterviewQuestion(
+            question="Tell me about yourself and why this role interests you.",
+            why_asked="Tests whether you can connect your experience, motivation, and career direction to the role.",
+            answer_framework="Present → Past → Future: current focus, relevant evidence, then why this role is the logical next step.",
+            talking_points=[f"Interest in the {role} position", f"Relevant strengths: {skills_text}", f"Why {company} fits your goals"],
+        ),
+        InterviewQuestion(
+            question=f"Describe a project where you used {first_skill} to solve a meaningful problem.",
+            why_asked=f"Looks for practical evidence behind the {first_skill} skill shown on your CV.",
+            answer_framework="Use STAR: situation, your specific task, actions you personally took, and a measurable result.",
+            talking_points=["Clarify your individual contribution", "Explain one technical decision", "Quantify the outcome where possible"],
+        ),
+        InterviewQuestion(
+            question="Tell me about a difficult technical or project challenge you overcame.",
+            why_asked="Assesses problem solving, ownership, and how you respond when the first approach does not work.",
+            answer_framework="Set the context briefly, explain the obstacle, compare the options you considered, and finish with the result and lesson.",
+            talking_points=["Show your reasoning", "Mention collaboration when relevant", "State what you would repeat or improve"],
+        ),
+        InterviewQuestion(
+            question="How do you make sure your work is reliable and maintainable?",
+            why_asked="Explores engineering discipline, quality standards, and awareness of future teammates.",
+            answer_framework="Give a concrete workflow covering planning, small changes, testing, review, documentation, and monitoring.",
+            talking_points=["Testing strategy", "Readable code and documentation", "Feedback and code review"],
+        ),
+        InterviewQuestion(
+            question=f"How would you get productive with {development_skill} if the role required it?",
+            why_asked="Checks learning speed and honesty about a skill that is not currently evidenced on the CV.",
+            answer_framework="Acknowledge the gap, relate it to something you already know, and give a time-boxed learning and practice plan.",
+            talking_points=["Be honest about current level", "Describe a hands-on learning project", "Explain how you would ask for feedback"],
+        ),
+        InterviewQuestion(
+            question="Describe a time you worked with others to deliver under a deadline.",
+            why_asked="Assesses communication, prioritisation, and dependable teamwork.",
+            answer_framework="Use STAR and focus on how you coordinated work, raised risks early, and protected the most important outcome.",
+            talking_points=["Your role in the team", "How priorities were agreed", "The final outcome and lesson"],
+        ),
+    ]
+    return StructuredApplicationKit(
+        cover_letter=cover_letter,
+        elevator_pitch=elevator_pitch,
+        interview_questions=questions,
+        questions_to_ask=[
+            f"What would success look like in the first three months for the {role} position?",
+            "What are the most important technical or product challenges the team is working on now?",
+            "How does the team support feedback, learning, and career development?",
+            "What distinguishes people who perform especially well on this team?",
+        ],
+    )
+
+
+def openai_application_kit(
+    candidate_name: str,
+    company: str,
+    role: str,
+    cv_text: str,
+    job_description: str,
+    matching_skills: list[str],
+    missing_skills: list[str],
+) -> StructuredApplicationKit:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.parse(
+        model=settings.openai_model,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert career coach. Produce a truthful, concise application toolkit grounded only "
+                    "in the supplied CV and job description. Never invent experience, qualifications, metrics, names, "
+                    "or enthusiasm about facts not provided. The cover letter should be 250-350 words and use UK "
+                    "English. Create exactly six diverse interview questions with useful answer frameworks and exactly "
+                    "four thoughtful questions for the candidate to ask the employer."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"CANDIDATE: {candidate_name}\nCOMPANY: {company}\nROLE: {role}\n"
+                    f"MATCHING SKILLS: {', '.join(matching_skills)}\nMISSING SKILLS: {', '.join(missing_skills)}\n\n"
+                    f"JOB DESCRIPTION:\n{job_description[:16000]}\n\nCV:\n{cv_text[:16000]}"
+                ),
+            },
+        ],
+        text_format=StructuredApplicationKit,
+    )
+    if response.output_parsed is None:
+        raise RuntimeError("OpenAI returned no structured application toolkit")
+    return response.output_parsed
+
+
+def generate_application_kit(
+    candidate_name: str,
+    company: str,
+    role: str,
+    cv_text: str,
+    job_description: str,
+    matching_skills: list[str],
+    missing_skills: list[str],
+) -> ApplicationKitResult:
+    provider = "local"
+    model: str | None = None
+    if settings.openai_api_key:
+        try:
+            generated = openai_application_kit(
+                candidate_name,
+                company,
+                role,
+                cv_text,
+                job_description,
+                matching_skills,
+                missing_skills,
+            )
+            provider = "openai"
+            model = settings.openai_model
+        except Exception:
+            generated = local_application_kit(candidate_name, company, role, matching_skills, missing_skills)
+            provider = "local_fallback"
+    else:
+        generated = local_application_kit(candidate_name, company, role, matching_skills, missing_skills)
+
+    return ApplicationKitResult(
+        cover_letter=generated.cover_letter.strip(),
+        elevator_pitch=generated.elevator_pitch.strip(),
+        interview_questions=[question.model_dump(mode="json") for question in generated.interview_questions[:6]],
+        questions_to_ask=generated.questions_to_ask[:4],
         provider=provider,
         model=model,
     )

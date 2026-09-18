@@ -87,6 +87,11 @@ class Application(Base):
         cascade="all, delete-orphan",
         uselist=False,
     )
+    application_kit: Mapped["ApplicationKit | None"] = relationship(
+        back_populates="application",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
 
 
 class Activity(Base):
@@ -183,3 +188,44 @@ class AIAnalysis(Base):
     )
 
     application: Mapped[Application] = relationship(back_populates="ai_analysis")
+
+
+class ApplicationKit(Base):
+    __tablename__ = "application_kits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    application_id: Mapped[int] = mapped_column(
+        ForeignKey("applications.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    cover_letter: Mapped[str] = mapped_column(Text, nullable=False)
+    elevator_pitch: Mapped[str] = mapped_column(Text, nullable=False)
+    interview_questions: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    questions_to_ask: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(120))
+    source_analysis_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_cv_uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_job_description_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_company: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_role: Mapped[str] = mapped_column(String(160), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    application: Mapped[Application] = relationship(back_populates="application_kit")
