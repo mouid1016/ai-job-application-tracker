@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, field_validator
 
@@ -238,8 +239,14 @@ class AnalyticsRead(BaseModel):
     top_matches: list[AnalyticsApplication]
 
 
+class AssistantMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=2000)
+
+
 class AssistantRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
+    history: list[AssistantMessage] = Field(default_factory=list, max_length=10)
 
     @field_validator("question")
     @classmethod

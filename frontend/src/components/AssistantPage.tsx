@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "../api";
-import type { AssistantResponse, JobApplication } from "../types";
+import type { AssistantMessage, AssistantResponse, JobApplication } from "../types";
 import { Icon } from "./Icon";
 
 const suggestions = [
@@ -10,24 +10,45 @@ const suggestions = [
   "Summarise my progress.",
 ];
 
+interface ChatEntry extends AssistantMessage {
+  id: number;
+  result?: AssistantResponse;
+}
+
 interface AssistantPageProps {
   applications: JobApplication[];
   onOpenApplication: (id: number) => void;
+  onOpenSettings: () => void;
 }
 
-export function AssistantPage({ applications, onOpenApplication }: AssistantPageProps) {
+export function AssistantPage({ applications, onOpenApplication, onOpenSettings }: AssistantPageProps) {
   const [question, setQuestion] = useState("");
-  const [result, setResult] = useState<AssistantResponse | null>(null);
+  const [messages, setMessages] = useState<ChatEntry[]>([]);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nextId = useRef(1);
+  const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    void api.getSettings().then((settings) => setAiConfigured(settings.ai.configured)).catch(() => setAiConfigured(false));
+  }, []);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [messages, asking]);
 
   async function ask(value = question) {
-    if (!value.trim()) return;
+    const cleaned = value.trim();
+    if (!cleaned || asking) return;
+    const history: AssistantMessage[] = messages.slice(-10).map(({ role, content }) => ({ role, content }));
+    setMessages((current) => [...current, { id: nextId.current++, role: "user", content: cleaned }]);
+    setQuestion("");
     try {
-      setQuestion(value);
       setAsking(true);
       setError(null);
-      setResult(await api.askAssistant(value));
+      const result = await api.askAssistant(cleaned, history);
+      setMessages((current) => [...current, { id: nextId.current++, role: "assistant", content: result.answer, result }]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The assistant could not answer");
     } finally {
@@ -40,30 +61,50 @@ export function AssistantPage({ applications, onOpenApplication }: AssistantPage
     void ask();
   }
 
-  const related = result?.related_application_ids.map((id) => applications.find((item) => item.id === id)).filter((item): item is JobApplication => Boolean(item)) ?? [];
-
   return (
     <div className="feature-page assistant-page">
-      <header className="page-header"><div><span className="eyebrow">YOUR JOB-SEARCH COPILOT</span><h1>AI Assistant</h1><p>Ask questions across your tracked applications and saved match analyses.</p></div><span className="assistant-mode"><Icon name="sparkles" size={14} /> Grounded in your data</span></header>
+      <header className="page-header"><div><span className="eyebrow">YOUR JOB-SEARCH COPILOT</span><h1>AI Assistant</h1><p>Have a conversation grounded in your applications and match analyses.</p></div><span className="assistant-mode"><Icon name="sparkles" size={14} /> {aiConfigured === true ? "OpenAI connected" : aiConfigured === false ? "Limited local mode" : "Checking connection…"}</span></header>
 
-      <section className="assistant-hero">
-        <div className="assistant-orb"><Icon name="sparkles" size={27} /></div>
-        <h2>What should we work on?</h2>
-        <p>I can prioritise roles, identify repeated skill gaps, review your progress, and create a focused weekly plan.</p>
-        <form onSubmit={submit}><textarea value={question} onChange={(event) => setQuestion(event.target.value)} rows={3} maxLength={500} placeholder="Ask about your applications…" /><button type="submit" disabled={asking || !question.trim()}>{asking ? <><span className="spinner" /> Thinking…</> : <><Icon name="sparkles" size={15} /> Ask assistant</>}</button></form>
-        <div className="prompt-grid">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={asking}>{suggestion}</button>)}</div>
+      {aiConfigured === false && <div className="assistant-connection-warning"><div><strong>Connect OpenAI for unrestricted questions</strong><p>You are currently using the limited local fallback, which can only handle a few job-search categories.</p></div><button onClick={onOpenSettings}>View setup</button></div>}
+
+      <section className={`assistant-chat ${messages.length ? "has-messages" : ""}`}>
+        {!messages.length && <div className="assistant-welcome">
+          <div className="assistant-orb"><Icon name="sparkles" size={27} /></div>
+          <h2>Ask about any part of your job search</h2>
+          <p>The examples below are starting points, not the only questions available. Once OpenAI is connected, you can ask free-form questions and follow up naturally.</p>
+          <span>Example questions</span>
+          <div className="prompt-grid">{suggestions.map((suggestion) => <button key={suggestion} onClick={() => void ask(suggestion)} disabled={asking}>{suggestion}</button>)}</div>
+        </div>}
+
+        {messages.length > 0 && <div className="chat-thread">
+          {messages.map((message) => {
+            const related = message.result?.related_application_ids.map((id) => applications.find((item) => item.id === id)).filter((item): item is JobApplication => Boolean(item)) ?? [];
+            return <article className={`chat-message ${message.role}`} key={message.id}>
+              <div className="chat-avatar">{message.role === "assistant" ? <Icon name="sparkles" size={15} /> : "You"}</div>
+              <div className="chat-bubble">
+                <p>{message.content}</p>
+                {message.result && <>
+                  <div className="response-meta">{message.result.provider === "openai" ? `OpenAI · ${message.result.model}` : message.result.provider === "local_fallback" ? "OpenAI unavailable · local fallback used" : "Limited local mode"}</div>
+                  <div className="assistant-columns">
+                    <div><h3>What stands out</h3><ul>{message.result.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                    <div><h3>Recommended actions</h3><ol>{message.result.recommended_actions.map((item) => <li key={item}>{item}</li>)}</ol></div>
+                  </div>
+                  {related.length > 0 && <div className="related-applications"><h3>Relevant applications</h3>{related.map((item) => <button key={item.id} onClick={() => onOpenApplication(item.id)}><span>{item.company[0]}</span><div><strong>{item.role}</strong><small>{item.company} · {item.status}</small></div><b>{item.match_score === null ? "Open" : `${item.match_score}%`}</b></button>)}</div>}
+                </>}
+              </div>
+            </article>;
+          })}
+          {asking && <article className="chat-message assistant"><div className="chat-avatar"><Icon name="sparkles" size={15} /></div><div className="chat-bubble typing"><span /><span /><span /></div></article>}
+          <div ref={endRef} />
+        </div>}
+
+        {error && <div className="auth-error" role="alert">{error}</div>}
+        <form className="chat-composer" onSubmit={submit}>
+          <textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void ask(); } }} rows={2} maxLength={500} placeholder="Ask anything about your job search…" />
+          <button type="submit" disabled={asking || !question.trim()}>{asking ? <span className="spinner" /> : <Icon name="sparkles" size={16} />}<span>{asking ? "Thinking" : "Send"}</span></button>
+        </form>
+        <p className="assistant-disclaimer">AI guidance can be wrong. Verify employer details and never invent experience in an application.</p>
       </section>
-
-      {error && <div className="auth-error" role="alert">{error}</div>}
-      {result && <section className="assistant-response">
-        <div className="response-heading"><div><span className="assistant-orb small"><Icon name="sparkles" size={16} /></span><div><h2>ApplyFlow’s recommendation</h2><p>{result.provider === "openai" ? "OpenAI analysis" : result.provider === "local_fallback" ? "Local fallback" : "Local career coach"}</p></div></div></div>
-        <p className="assistant-answer">{result.answer}</p>
-        <div className="assistant-columns">
-          <div><h3>What stands out</h3><ul>{result.highlights.map((item) => <li key={item}>{item}</li>)}</ul></div>
-          <div><h3>Recommended actions</h3><ol>{result.recommended_actions.map((item) => <li key={item}>{item}</li>)}</ol></div>
-        </div>
-        {related.length > 0 && <div className="related-applications"><h3>Relevant applications</h3>{related.map((item) => <button key={item.id} onClick={() => onOpenApplication(item.id)}><span>{item.company[0]}</span><div><strong>{item.role}</strong><small>{item.company} · {item.status}</small></div><b>{item.match_score === null ? "Open" : `${item.match_score}%`}</b></button>)}</div>}
-      </section>}
     </div>
   );
 }

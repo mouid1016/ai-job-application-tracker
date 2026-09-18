@@ -49,6 +49,35 @@ def test_cross_application_assistant_uses_only_current_users_data(
     assert "Secret Corp" not in answer["answer"]
     assert answer["recommended_actions"]
 
+    follow_up = client.post(
+        "/api/assistant",
+        headers=owner,
+        json={
+            "question": "What should I do next?",
+            "history": [
+                {"role": "user", "content": "Help me prepare for my interview."},
+                {"role": "assistant", "content": "Focus on Priority Labs first."},
+            ],
+        },
+    )
+    assert follow_up.status_code == 200
+
+
+def test_assistant_rejects_oversized_conversation_history(
+    client: TestClient,
+    register: Callable[[str, str], dict[str, str]],
+) -> None:
+    headers = register("History User", "history@example.com")
+    history = [{"role": "user", "content": f"Message {index}"} for index in range(11)]
+
+    response = client.post(
+        "/api/assistant",
+        headers=headers,
+        json={"question": "What should I do next?", "history": history},
+    )
+
+    assert response.status_code == 422
+
 
 def test_profile_password_export_and_account_deletion(
     client: TestClient,

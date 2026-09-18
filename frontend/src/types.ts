@@ -155,6 +155,11 @@ export interface AssistantResponse {
   model: string | null;
 }
 
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface User {
   id: number;
   name: string;
