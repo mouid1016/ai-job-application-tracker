@@ -19,7 +19,7 @@ Open:
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/api/health
 
-The app creates its tables and optional demo applications automatically. To stop it, run `docker compose down`. Your PostgreSQL data remains in the `postgres_data` Docker volume.
+The backend applies pending Alembic database migrations and creates optional demo applications automatically. To stop it, run `docker compose down`. Your PostgreSQL data remains in the `postgres_data` Docker volume.
 
 ### Demo account
 
@@ -75,7 +75,8 @@ source .venv/bin/activate
 Then install and run:
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -109,6 +110,9 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 - Six role-aware interview questions with answer frameworks and talking points
 - Four thoughtful questions to ask the employer
 - Automatic stale-content warnings after the CV, job description, company, role, or analysis changes
+- Alembic migration history for reproducible database changes
+- Automated backend API tests with isolated test data
+- GitHub Actions CI for migrations, tests, linting, and production builds
 - Search by company or role
 - FastAPI CRUD endpoints with automatic Swagger docs
 - PostgreSQL in Docker and SQLite for quick local development
@@ -144,12 +148,14 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 ai-job-application-tracker/
 ├── .vscode/
 ├── backend/
+│   ├── alembic/
 │   ├── app/
 │   │   ├── config.py
 │   │   ├── database.py
 │   │   ├── main.py
 │   │   ├── models.py
 │   │   └── schemas.py
+│   ├── tests/
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── frontend/
@@ -162,11 +168,37 @@ ai-job-application-tracker/
 │   ├── Dockerfile
 │   └── package.json
 ├── .env.example
+├── .github/workflows/ci.yml
 ├── docker-compose.yml
 └── README.md
 ```
 
+## Tests and database migrations
+
+Run the backend checks from `backend/`:
+
+```bash
+pytest
+alembic check
+```
+
+Create a migration after changing a SQLAlchemy model:
+
+```bash
+alembic revision --autogenerate -m "describe the schema change"
+alembic upgrade head
+```
+
+Run the frontend checks from `frontend/`:
+
+```bash
+npm run lint
+npm run build
+```
+
+GitHub Actions runs all of these checks automatically for every pull request and every push to `main`.
+
 ## Next milestones
 
-1. Automated tests, Alembic migrations, and CI
-2. Deployment and a public demo environment
+1. Deployment and a public demo environment
+2. Expanded browser-level end-to-end tests

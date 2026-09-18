@@ -8,7 +8,7 @@ from sqlalchemy import func, inspect, select, text, update
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .database import Base, SessionLocal, engine, get_db
+from .database import SessionLocal, engine, get_db
 from .document_service import document_path, read_upload, remove_document, store_document
 from .ai_service import analyse_match, description_hash, generate_application_kit
 from .models import AIAnalysis, Activity, Application, ApplicationKit, ApplicationStatus, Document, User
@@ -154,7 +154,6 @@ def backfill_activity_history() -> None:
 
 
 def prepare_database() -> None:
-    Base.metadata.create_all(bind=engine)
     upgrade_v1_database()
     seed_database()
     backfill_activity_history()
