@@ -1,6 +1,6 @@
 # AI Job Application Tracker
 
-A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, explainable AI job matching, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
+A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, explainable AI job matching, tailored application toolkits, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
 
 ## Quick start (recommended)
 
@@ -32,14 +32,14 @@ You can also register a fresh account. Each account sees only its own applicatio
 
 ### Optional OpenAI enhancement
 
-The matching feature works without a paid API key using the built-in deterministic skills engine. To add richer structured extraction and recommendations, put an OpenAI API key in `.env`:
+The matching and application-toolkit features work without a paid API key using built-in local generators. To add richer structured extraction, recommendations, cover letters, and interview preparation, put an OpenAI API key in `.env`:
 
 ```text
 OPENAI_API_KEY=your-key-here
 OPENAI_MODEL=gpt-6-astra
 ```
 
-The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled.
+The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled. When OpenAI mode is enabled, the CV text and job description are sent to the OpenAI API to generate the requested content.
 
 ## Open in VS Code
 
@@ -105,6 +105,10 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 - Private PDF/DOCX CV upload, replacement, download, deletion, and text extraction
 - Explainable CV-to-job skill matching with deterministic coverage scores
 - Optional OpenAI Structured Outputs for richer extraction and recommendations
+- Saved application toolkit with a tailored cover letter and elevator pitch
+- Six role-aware interview questions with answer frameworks and talking points
+- Four thoughtful questions to ask the employer
+- Automatic stale-content warnings after the CV, job description, company, role, or analysis changes
 - Search by company or role
 - FastAPI CRUD endpoints with automatic Swagger docs
 - PostgreSQL in Docker and SQLite for quick local development
@@ -130,6 +134,8 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `DELETE` | `/api/applications/{id}/documents/cv` | Remove a CV |
 | `GET` | `/api/applications/{id}/analysis` | Read the saved match analysis |
 | `POST` | `/api/applications/{id}/analysis` | Analyse the CV against the job description |
+| `GET` | `/api/applications/{id}/application-kit` | Read the saved cover letter and interview toolkit |
+| `POST` | `/api/applications/{id}/application-kit` | Generate or refresh the application toolkit |
 | `GET` | `/api/stats` | Dashboard statistics |
 
 ## Project structure
@@ -162,6 +168,5 @@ ai-job-application-tracker/
 
 ## Next milestones
 
-1. Tailored cover letters and interview questions
-2. Automated tests, Alembic migrations, and CI
-3. Deployment and a public demo environment
+1. Automated tests, Alembic migrations, and CI
+2. Deployment and a public demo environment

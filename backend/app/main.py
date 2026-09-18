@@ -10,11 +10,12 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import Base, SessionLocal, engine, get_db
 from .document_service import document_path, read_upload, remove_document, store_document
-from .ai_service import analyse_match, description_hash
-from .models import AIAnalysis, Activity, Application, ApplicationStatus, Document, User
+from .ai_service import analyse_match, description_hash, generate_application_kit
+from .models import AIAnalysis, Activity, Application, ApplicationKit, ApplicationStatus, Document, User
 from .schemas import (
     AIAnalysisRead,
     ActivityRead,
+    ApplicationKitRead,
     ApplicationCreate,
     ApplicationRead,
     ApplicationUpdate,
@@ -165,7 +166,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.4.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -631,6 +632,128 @@ def run_analysis(
     db.commit()
     db.refresh(analysis)
     return analysis_response(analysis, application, document)
+
+
+def find_application_kit(application_id: int, user_id: int, db: Session) -> ApplicationKit | None:
+    return db.scalar(
+        select(ApplicationKit).where(
+            ApplicationKit.application_id == application_id,
+            ApplicationKit.user_id == user_id,
+        )
+    )
+
+
+def application_kit_response(
+    kit: ApplicationKit,
+    application: Application,
+    document: Document | None,
+    analysis: AIAnalysis | None,
+) -> ApplicationKitRead:
+    source_changed = (
+        document is None
+        or analysis is None
+        or document.uploaded_at.replace(tzinfo=None)
+        != kit.source_cv_uploaded_at.replace(tzinfo=None)
+        or analysis.updated_at.replace(tzinfo=None)
+        != kit.source_analysis_updated_at.replace(tzinfo=None)
+        or description_hash(application.job_description or "")
+        != kit.source_job_description_hash
+        or application.company != kit.source_company
+        or application.role != kit.source_role
+    )
+    return ApplicationKitRead(
+        id=kit.id,
+        application_id=kit.application_id,
+        cover_letter=kit.cover_letter,
+        elevator_pitch=kit.elevator_pitch,
+        interview_questions=kit.interview_questions,
+        questions_to_ask=kit.questions_to_ask,
+        provider=kit.provider,
+        model=kit.model,
+        is_stale=source_changed,
+        created_at=kit.created_at,
+        updated_at=kit.updated_at,
+    )
+
+
+@app.get("/api/applications/{application_id}/application-kit", response_model=ApplicationKitRead | None)
+def get_application_kit(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApplicationKitRead | None:
+    application = find_application(application_id, current_user.id, db)
+    kit = find_application_kit(application_id, current_user.id, db)
+    if kit is None:
+        return None
+    return application_kit_response(
+        kit,
+        application,
+        find_cv(application_id, current_user.id, db),
+        find_analysis(application_id, current_user.id, db),
+    )
+
+
+@app.post("/api/applications/{application_id}/application-kit", response_model=ApplicationKitRead)
+def create_application_kit(
+    application_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApplicationKitRead:
+    application = find_application(application_id, current_user.id, db)
+    if not application.job_description or not application.job_description.strip():
+        raise HTTPException(status_code=422, detail="Add and save a job description before generating a toolkit")
+    document = find_cv(application_id, current_user.id, db)
+    if document is None or not document.extracted_text.strip():
+        raise HTTPException(status_code=422, detail="Upload a readable CV before generating a toolkit")
+    analysis = find_analysis(application_id, current_user.id, db)
+    if analysis is None or analysis_response(analysis, application, document).is_stale:
+        raise HTTPException(status_code=422, detail="Run an up-to-date match analysis first")
+
+    result = generate_application_kit(
+        current_user.name,
+        application.company,
+        application.role,
+        document.extracted_text,
+        application.job_description,
+        analysis.matching_skills,
+        analysis.missing_skills,
+    )
+    kit = find_application_kit(application_id, current_user.id, db)
+    values = {
+        "cover_letter": result.cover_letter,
+        "elevator_pitch": result.elevator_pitch,
+        "interview_questions": result.interview_questions,
+        "questions_to_ask": result.questions_to_ask,
+        "provider": result.provider,
+        "model": result.model,
+        "source_analysis_updated_at": analysis.updated_at,
+        "source_cv_uploaded_at": document.uploaded_at,
+        "source_job_description_hash": description_hash(application.job_description),
+        "source_company": application.company,
+        "source_role": application.role,
+    }
+    if kit is None:
+        kit = ApplicationKit(
+            application_id=application.id,
+            user_id=current_user.id,
+            **values,
+        )
+        db.add(kit)
+    else:
+        for field, value in values.items():
+            setattr(kit, field, value)
+
+    db.add(
+        Activity(
+            application_id=application.id,
+            event_type="application_kit_generated",
+            description="Generated cover letter and interview preparation kit",
+        )
+    )
+    db.commit()
+    db.refresh(kit)
+    return application_kit_response(kit, application, document, analysis)
 
 
 @app.delete("/api/applications/{application_id}", status_code=status.HTTP_204_NO_CONTENT)

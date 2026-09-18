@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api } from "../api";
-import type { Activity, AIAnalysis, ApplicationStatus, ApplicationUpdate, CvDocument, JobApplication } from "../types";
+import type { Activity, AIAnalysis, ApplicationKit, ApplicationStatus, ApplicationUpdate, CvDocument, JobApplication } from "../types";
 import { Icon } from "./Icon";
 
 interface ApplicationDetailModalProps {
@@ -59,6 +59,10 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(true);
   const [runningAnalysis, setRunningAnalysis] = useState(false);
+  const [applicationKit, setApplicationKit] = useState<ApplicationKit | null>(null);
+  const [loadingKit, setLoadingKit] = useState(true);
+  const [generatingKit, setGeneratingKit] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +97,16 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
     }
   }, [application.id]);
 
+  const loadApplicationKit = useCallback(async () => {
+    try {
+      setApplicationKit(await api.getApplicationKit(application.id));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not load the application toolkit");
+    } finally {
+      setLoadingKit(false);
+    }
+  }, [application.id]);
+
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => event.key === "Escape" && onClose();
     window.addEventListener("keydown", closeOnEscape);
@@ -100,12 +114,13 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       void loadActivities();
       void loadCv();
       void loadAnalysis();
+      void loadApplicationKit();
     }, 0);
     return () => {
       window.removeEventListener("keydown", closeOnEscape);
       window.clearTimeout(timer);
     };
-  }, [loadActivities, loadAnalysis, loadCv, onClose]);
+  }, [loadActivities, loadAnalysis, loadApplicationKit, loadCv, onClose]);
 
   async function uploadCv(file: File | undefined) {
     if (!file) return;
@@ -123,6 +138,7 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       setCv(await api.uploadCv(application.id, file));
       onSaved(await api.getApplication(application.id));
       await loadAnalysis();
+      await loadApplicationKit();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
@@ -157,6 +173,7 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       setCv(null);
       onSaved(await api.getApplication(application.id));
       await loadAnalysis();
+      await loadApplicationKit();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
@@ -168,6 +185,12 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
 
   function update<K extends keyof DetailForm>(field: K, value: DetailForm[K]) {
     setSaved(false);
+    if (field === "company" || field === "role" || field === "job_description") {
+      setApplicationKit((current) => current ? { ...current, is_stale: true } : current);
+    }
+    if (field === "job_description") {
+      setAnalysis((current) => current ? { ...current, is_stale: true } : current);
+    }
     setForm((current) => ({ ...current, [field]: value }));
   }
 
@@ -194,6 +217,7 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       onSaved(updated);
       setSaved(true);
       await loadAnalysis();
+      await loadApplicationKit();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
@@ -220,12 +244,41 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
       setAnalysis(result);
       onSaved({ ...updated, match_score: result.match_score });
       setSaved(true);
+      await loadApplicationKit();
       setLoadingHistory(true);
       await loadActivities();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not analyse this application");
     } finally {
       setRunningAnalysis(false);
+    }
+  }
+
+  async function generateKit() {
+    if (!analysis || analysis.is_stale) {
+      setError("Run an up-to-date match analysis before generating your toolkit");
+      return;
+    }
+    try {
+      setGeneratingKit(true);
+      setError(null);
+      setApplicationKit(await api.generateApplicationKit(application.id));
+      setLoadingHistory(true);
+      await loadActivities();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not generate the application toolkit");
+    } finally {
+      setGeneratingKit(false);
+    }
+  }
+
+  async function copyText(label: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      window.setTimeout(() => setCopied((current) => current === label ? null : current), 1800);
+    } catch {
+      setError("Your browser could not copy this text. Select it manually instead.");
     }
   }
 
@@ -321,6 +374,61 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
               </button>
             </section>
 
+            <section className="kit-section" aria-labelledby="kit-heading">
+              <div className="kit-heading">
+                <div className="analysis-title">
+                  <span><Icon name="document" size={17} /></span>
+                  <div><h3 id="kit-heading">Application toolkit</h3><p>Tailored writing and interview preparation</p></div>
+                </div>
+                {applicationKit && <span className="analysis-provider">{applicationKit.provider === "openai" ? "OpenAI" : "Local engine"}</span>}
+              </div>
+              {loadingKit ? (
+                <div className="analysis-loading"><span className="spinner" /></div>
+              ) : applicationKit ? (
+                <div className="kit-results">
+                  {applicationKit.is_stale && <div className="analysis-stale">This toolkit was created from older application details. Run the match analysis again, then regenerate it.</div>}
+
+                  <article className="kit-card">
+                    <div className="kit-card-heading"><h4>Elevator pitch</h4><button type="button" onClick={() => void copyText("pitch", applicationKit.elevator_pitch)}>{copied === "pitch" ? "Copied ✓" : "Copy"}</button></div>
+                    <p>{applicationKit.elevator_pitch}</p>
+                  </article>
+
+                  <article className="kit-card">
+                    <div className="kit-card-heading"><h4>Cover letter</h4><button type="button" onClick={() => void copyText("cover-letter", applicationKit.cover_letter)}>{copied === "cover-letter" ? "Copied ✓" : "Copy"}</button></div>
+                    <div className="cover-letter-copy">{applicationKit.cover_letter}</div>
+                  </article>
+
+                  <div className="kit-card">
+                    <div className="kit-card-heading"><h4>Interview questions</h4><span>{applicationKit.interview_questions.length}</span></div>
+                    <div className="interview-list">
+                      {applicationKit.interview_questions.map((item, index) => (
+                        <details key={`${index}-${item.question}`}>
+                          <summary><span>{index + 1}</span>{item.question}</summary>
+                          <div className="interview-answer">
+                            <p><strong>Why they may ask:</strong> {item.why_asked}</p>
+                            <p><strong>Answer framework:</strong> {item.answer_framework}</p>
+                            <strong>Talking points</strong>
+                            <ul>{item.talking_points.map((point) => <li key={point}>{point}</li>)}</ul>
+                          </div>
+                        </details>
+                      ))}
+                    </div>
+                  </div>
+
+                  <article className="kit-card">
+                    <div className="kit-card-heading"><h4>Questions to ask the employer</h4><button type="button" onClick={() => void copyText("employer-questions", applicationKit.questions_to_ask.map((question, index) => `${index + 1}. ${question}`).join("\n"))}>{copied === "employer-questions" ? "Copied ✓" : "Copy all"}</button></div>
+                    <ol className="employer-questions">{applicationKit.questions_to_ask.map((question) => <li key={question}>{question}</li>)}</ol>
+                  </article>
+                </div>
+              ) : (
+                <div className="analysis-empty"><strong>Build your application toolkit</strong><p>Use your current CV and match analysis to prepare a tailored cover letter, pitch, and interview questions.</p></div>
+              )}
+              <button className="kit-button" type="button" onClick={() => void generateKit()} disabled={generatingKit || !analysis || analysis.is_stale || !cv || !form.job_description.trim()}>
+                {generatingKit ? <><span className="spinner" /> Building toolkit…</> : <><Icon name="sparkles" size={15} /> {applicationKit ? "Regenerate toolkit" : "Generate application toolkit"}</>}
+              </button>
+              {(!analysis || analysis.is_stale) && <p className="kit-requirement">A current match analysis is required before generation.</p>}
+            </section>
+
             {error && <div className="auth-error" role="alert">{error}</div>}
             <div className="detail-actions">
               {saved && <span className="saved-confirmation">✓ Changes saved</span>}
@@ -338,7 +446,7 @@ export function ApplicationDetailModal({ application, onClose, onSaved }: Applic
               <ol className="activity-list">
                 {activities.map((activity) => (
                   <li key={activity.id} className={activity.event_type}>
-                    <span className="activity-icon"><Icon name={activity.event_type === "analysis_completed" ? "sparkles" : activity.event_type.startsWith("cv_") ? "document" : activity.event_type === "status_changed" ? "chart" : activity.event_type === "created" ? "plus" : "briefcase"} size={14} /></span>
+                    <span className="activity-icon"><Icon name={activity.event_type === "analysis_completed" || activity.event_type === "application_kit_generated" ? "sparkles" : activity.event_type.startsWith("cv_") ? "document" : activity.event_type === "status_changed" ? "chart" : activity.event_type === "created" ? "plus" : "briefcase"} size={14} /></span>
                     <div><strong>{activity.description}</strong><time>{formatActivityDate(activity.created_at)}</time></div>
                   </li>
                 ))}

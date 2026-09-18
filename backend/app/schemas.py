@@ -153,3 +153,24 @@ class AIAnalysisRead(BaseModel):
     is_stale: bool
     created_at: datetime
     updated_at: datetime
+
+
+class InterviewQuestionRead(BaseModel):
+    question: str
+    why_asked: str
+    answer_framework: str
+    talking_points: list[str]
+
+
+class ApplicationKitRead(BaseModel):
+    id: int
+    application_id: int
+    cover_letter: str
+    elevator_pitch: str
+    interview_questions: list[InterviewQuestionRead]
+    questions_to_ask: list[str]
+    provider: str
+    model: str | None
+    is_stale: bool
+    created_at: datetime
+    updated_at: datetime

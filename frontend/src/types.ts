@@ -89,6 +89,27 @@ export interface AIAnalysis {
   updated_at: string;
 }
 
+export interface InterviewQuestion {
+  question: string;
+  why_asked: string;
+  answer_framework: string;
+  talking_points: string[];
+}
+
+export interface ApplicationKit {
+  id: number;
+  application_id: number;
+  cover_letter: string;
+  elevator_pitch: string;
+  interview_questions: InterviewQuestion[];
+  questions_to_ask: string[];
+  provider: "openai" | "local" | "local_fallback" | string;
+  model: string | null;
+  is_stale: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DashboardStats {
   total: number;
   active: number;
