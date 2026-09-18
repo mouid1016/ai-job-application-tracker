@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from hashlib import sha256
+import json
 import re
 
 from pydantic import BaseModel
@@ -112,6 +113,13 @@ class StructuredApplicationKit(BaseModel):
     questions_to_ask: list[str]
 
 
+class StructuredAssistantResponse(BaseModel):
+    answer: str
+    highlights: list[str]
+    recommended_actions: list[str]
+    related_application_ids: list[int]
+
+
 @dataclass
 class AnalysisResult:
     match_score: int
@@ -133,6 +141,16 @@ class ApplicationKitResult:
     elevator_pitch: str
     interview_questions: list[dict[str, object]]
     questions_to_ask: list[str]
+    provider: str
+    model: str | None
+
+
+@dataclass
+class AssistantResult:
+    answer: str
+    highlights: list[str]
+    recommended_actions: list[str]
+    related_application_ids: list[int]
     provider: str
     model: str | None
 
@@ -422,6 +440,136 @@ def generate_application_kit(
         elevator_pitch=generated.elevator_pitch.strip(),
         interview_questions=[question.model_dump(mode="json") for question in generated.interview_questions[:6]],
         questions_to_ask=generated.questions_to_ask[:4],
+        provider=provider,
+        model=model,
+    )
+
+
+def local_assistant_response(
+    question: str,
+    applications: list[dict[str, object]],
+    common_missing_skills: list[str],
+) -> StructuredAssistantResponse:
+    if not applications:
+        return StructuredAssistantResponse(
+            answer="Add your first job application and I can help you prioritise opportunities, identify skill gaps, and plan follow-ups.",
+            highlights=["No applications are currently tracked."],
+            recommended_actions=["Add a role you are interested in", "Upload the CV you would use", "Run a match analysis"],
+            related_application_ids=[],
+        )
+
+    active = [item for item in applications if item["status"] not in {"offer", "rejected"}]
+    interviews = [item for item in applications if item["status"] == "interview"]
+    with_deadlines = sorted(
+        [item for item in active if item.get("deadline")],
+        key=lambda item: str(item["deadline"]),
+    )
+    scored = sorted(
+        [item for item in active if item.get("match_score") is not None],
+        key=lambda item: int(item["match_score"]),
+        reverse=True,
+    )
+    priority = with_deadlines[:2] or interviews[:2] or scored[:2] or active[:2]
+    related_ids = [int(item["id"]) for item in priority]
+    lower_question = question.casefold()
+
+    if "skill" in lower_question or "missing" in lower_question:
+        skills = ", ".join(common_missing_skills[:5]) or "No repeated skill gaps have been identified yet"
+        answer = f"Your most common evidenced skill gaps are: {skills}. Focus on gaps that appear in several target roles, but only add them to your CV after you have genuine project or work evidence."
+    elif "interview" in lower_question:
+        if interviews:
+            roles = ", ".join(f"{item['role']} at {item['company']}" for item in interviews[:3])
+            answer = f"Prioritise interview preparation for {roles}. Review the saved toolkit for each role, prepare two strong STAR examples, and rehearse a concise explanation of your most relevant project."
+            related_ids = [int(item["id"]) for item in interviews[:3]]
+        else:
+            answer = "You do not currently have an application in the interview stage. Prepare reusable STAR examples now, while continuing focused follow-ups on active applications."
+    elif "week" in lower_question or "plan" in lower_question:
+        answer = "Use a simple weekly rhythm: submit a small number of well-matched applications, follow up on existing applications, close one recurring skill gap with a practical project, and prepare interview stories before you need them."
+    elif "progress" in lower_question or "summary" in lower_question:
+        answer = f"You are tracking {len(applications)} applications, with {len(active)} still active and {len(interviews)} currently at interview stage. Your next improvement should be consistent follow-up and keeping every CV match analysis current."
+    else:
+        targets = ", ".join(f"{item['role']} at {item['company']}" for item in priority)
+        answer = f"Your best immediate focus is {targets}. These applications stand out because of an upcoming deadline, advanced status, or stronger match score. Keep the advice evidence-based and check each role's current details before acting."
+
+    highlights = [
+        f"{len(active)} active application{'s' if len(active) != 1 else ''}",
+        f"{len(interviews)} interview-stage application{'s' if len(interviews) != 1 else ''}",
+    ]
+    if scored:
+        highlights.append(f"Highest current match: {scored[0]['match_score']}% for {scored[0]['role']} at {scored[0]['company']}")
+    return StructuredAssistantResponse(
+        answer=answer,
+        highlights=highlights,
+        recommended_actions=[
+            "Review the highest-priority application today",
+            "Follow up on applications that have been quiet for a week",
+            "Keep CV evidence and job descriptions up to date",
+        ],
+        related_application_ids=related_ids,
+    )
+
+
+def openai_assistant_response(
+    question: str,
+    applications: list[dict[str, object]],
+    common_missing_skills: list[str],
+) -> StructuredAssistantResponse:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.responses.parse(
+        model=settings.openai_model,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a concise job-search coach. Answer only from the supplied application data. "
+                    "Do not invent employer responses, candidate experience, deadlines, or skills. Clearly distinguish "
+                    "facts from recommendations. Give at most five short highlights, five concrete actions, and only "
+                    "application IDs that exist in the supplied data. Use UK English."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"QUESTION:\n{question}\n\nCOMMON MISSING SKILLS:\n{', '.join(common_missing_skills[:10]) or 'None yet'}"
+                    f"\n\nAPPLICATION DATA:\n{json.dumps(applications, ensure_ascii=False)[:24000]}"
+                ),
+            },
+        ],
+        text_format=StructuredAssistantResponse,
+    )
+    if response.output_parsed is None:
+        raise RuntimeError("OpenAI returned no structured assistant response")
+    valid_ids = {int(item["id"]) for item in applications}
+    parsed = response.output_parsed
+    parsed.related_application_ids = [item for item in parsed.related_application_ids if item in valid_ids]
+    return parsed
+
+
+def answer_career_question(
+    question: str,
+    applications: list[dict[str, object]],
+    common_missing_skills: list[str],
+) -> AssistantResult:
+    provider = "local"
+    model: str | None = None
+    if settings.openai_api_key:
+        try:
+            generated = openai_assistant_response(question, applications, common_missing_skills)
+            provider = "openai"
+            model = settings.openai_model
+        except Exception:
+            generated = local_assistant_response(question, applications, common_missing_skills)
+            provider = "local_fallback"
+    else:
+        generated = local_assistant_response(question, applications, common_missing_skills)
+
+    return AssistantResult(
+        answer=generated.answer.strip(),
+        highlights=generated.highlights[:5],
+        recommended_actions=generated.recommended_actions[:5],
+        related_application_ids=generated.related_application_ids[:5],
         provider=provider,
         model=model,
     )

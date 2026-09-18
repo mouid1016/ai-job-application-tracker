@@ -1,6 +1,6 @@
 # AI Job Application Tracker
 
-A portfolio-ready full-stack application for tracking job applications on a Kanban board. It includes a responsive React dashboard, secure JWT authentication, private CV upload and text extraction, explainable AI job matching, tailored application toolkits, a FastAPI API, PostgreSQL persistence, demo data, and Docker setup.
+A portfolio-ready full-stack application for managing an entire job search. It includes a responsive Kanban dashboard, pipeline analytics, a cross-application AI assistant, secure account settings, private CV extraction, explainable AI matching, tailored application toolkits, a FastAPI API, PostgreSQL persistence, automated tests, and Docker setup.
 
 ## Quick start (recommended)
 
@@ -32,14 +32,14 @@ You can also register a fresh account. Each account sees only its own applicatio
 
 ### Optional OpenAI enhancement
 
-The matching and application-toolkit features work without a paid API key using built-in local generators. To add richer structured extraction, recommendations, cover letters, and interview preparation, put an OpenAI API key in `.env`:
+The matching, application-toolkit, and assistant features work without a paid API key using built-in local generators. To add richer structured extraction, recommendations, cover letters, interview preparation, and cross-application coaching, put an OpenAI API key in `.env`:
 
 ```text
 OPENAI_API_KEY=your-key-here
 OPENAI_MODEL=gpt-6-astra
 ```
 
-The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled. When OpenAI mode is enabled, the CV text and job description are sent to the OpenAI API to generate the requested content.
+The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled. When OpenAI mode is enabled, relevant CV/job-description text or a compact application summary is sent to the OpenAI API only when the user requests an AI feature.
 
 ## Open in VS Code
 
@@ -95,6 +95,9 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 ## Included features
 
 - Dashboard metrics for total applications, interviews, offers, and response rate
+- Dedicated analytics page with pipeline distribution, monthly activity, deadlines, and strongest matches
+- Cross-application AI assistant for prioritisation, skill gaps, progress reviews, and weekly planning
+- Profile and password management, AI connection status, portable JSON export, and secure account deletion
 - Registration, login, persistent sessions, and logout
 - Argon2 password hashing and signed JWT access tokens
 - Per-user application ownership and API-level data isolation
@@ -126,6 +129,11 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `POST` | `/api/auth/register` | Create an account and receive a token |
 | `POST` | `/api/auth/login` | Sign in and receive a token |
 | `GET` | `/api/auth/me` | Read the authenticated user |
+| `GET` | `/api/settings` | Read profile and AI configuration status |
+| `PATCH` | `/api/settings/profile` | Update the authenticated user's name and email |
+| `POST` | `/api/settings/password` | Change the authenticated user's password |
+| `GET` | `/api/settings/export` | Export all account and application data as JSON |
+| `DELETE` | `/api/settings/account` | Permanently delete the authenticated account |
 | `GET` | `/api/applications` | List applications |
 | `POST` | `/api/applications` | Create an application |
 | `GET` | `/api/applications/{id}` | Read one application |
@@ -141,6 +149,8 @@ Vite proxies `/api` requests to the backend at `http://localhost:8000`.
 | `GET` | `/api/applications/{id}/application-kit` | Read the saved cover letter and interview toolkit |
 | `POST` | `/api/applications/{id}/application-kit` | Generate or refresh the application toolkit |
 | `GET` | `/api/stats` | Dashboard statistics |
+| `GET` | `/api/analytics` | Read private pipeline analytics and ranked applications |
+| `POST` | `/api/assistant` | Ask a question across the user's application data |
 
 ## Project structure
 
@@ -202,3 +212,4 @@ GitHub Actions runs all of these checks automatically for every pull request and
 
 1. Deployment and a public demo environment
 2. Expanded browser-level end-to-end tests
+3. Optional email reminders for deadlines and follow-ups
