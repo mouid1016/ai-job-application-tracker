@@ -32,14 +32,27 @@ You can also register a fresh account. Each account sees only its own applicatio
 
 ### Optional OpenAI enhancement
 
-The matching, application-toolkit, and assistant features work without a paid API key using built-in local generators. To add richer structured extraction, recommendations, cover letters, interview preparation, and cross-application coaching, put an OpenAI API key in `.env`:
+The matching, application-toolkit, and assistant features work without an API key using built-in local generators. The local assistant is intentionally limited to a few common job-search categories. To unlock free-form questions, natural follow-ups, richer structured extraction, recommendations, cover letters, interview preparation, and cross-application coaching:
+
+1. Create an API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+2. Open the `.env` file in the project root.
+3. Add your key and keep the model setting:
 
 ```text
 OPENAI_API_KEY=your-key-here
 OPENAI_MODEL=gpt-6-astra
 ```
 
-The API key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled. When OpenAI mode is enabled, relevant CV/job-description text or a compact application summary is sent to the OpenAI API only when the user requests an AI feature.
+4. Save `.env`, then restart the containers:
+
+```bash
+docker compose down
+docker compose up --build
+```
+
+5. Open **Settings → AI configuration**. It should display **OpenAI connected**.
+
+Never paste the API key into the website, commit it to GitHub, or share it in screenshots. The key stays in the backend and is never sent to the browser. Match percentages remain deterministic even when OpenAI extraction is enabled. When OpenAI mode is enabled, relevant CV/job-description text or a compact application summary is sent to the OpenAI API only when the user requests an AI feature.
 
 ## Open in VS Code
 

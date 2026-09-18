@@ -1034,6 +1034,7 @@ def ask_assistant(
         payload.question,
         context,
         [skill for skill, _ in missing_skill_counts.most_common(10)],
+        [message.model_dump() for message in payload.history],
     )
     return AssistantResponse(
         answer=result.answer,

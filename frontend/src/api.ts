@@ -2,6 +2,7 @@ import type {
   Activity,
   AIAnalysis,
   AnalyticsData,
+  AssistantMessage,
   AssistantResponse,
   ApplicationKit,
   ApplicationCreate,
@@ -111,8 +112,8 @@ export const api = {
   generateApplicationKit: (id: number) => request<ApplicationKit>(`/applications/${id}/application-kit`, { method: "POST" }),
   getStats: () => request<DashboardStats>("/stats"),
   getAnalytics: () => request<AnalyticsData>("/analytics"),
-  askAssistant: (question: string) =>
-    request<AssistantResponse>("/assistant", { method: "POST", body: JSON.stringify({ question }) }),
+  askAssistant: (question: string, history: AssistantMessage[] = []) =>
+    request<AssistantResponse>("/assistant", { method: "POST", body: JSON.stringify({ question, history }) }),
   createApplication: (payload: ApplicationCreate) =>
     request<JobApplication>("/applications", {
       method: "POST",
