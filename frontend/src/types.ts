@@ -118,11 +118,56 @@ export interface DashboardStats {
   response_rate: number;
 }
 
+export interface AnalyticsApplication {
+  id: number;
+  company: string;
+  role: string;
+  status: ApplicationStatus;
+  deadline: string | null;
+  match_score: number | null;
+}
+
+export interface AnalyticsPoint {
+  label: string;
+  value: number;
+}
+
+export interface AnalyticsData {
+  total: number;
+  active: number;
+  response_rate: number;
+  interview_rate: number;
+  offer_rate: number;
+  average_match_score: number | null;
+  analysed_applications: number;
+  status_counts: Record<ApplicationStatus, number>;
+  monthly_applications: AnalyticsPoint[];
+  upcoming_deadlines: AnalyticsApplication[];
+  top_matches: AnalyticsApplication[];
+}
+
+export interface AssistantResponse {
+  answer: string;
+  highlights: string[];
+  recommended_actions: string[];
+  related_application_ids: number[];
+  provider: "openai" | "local" | "local_fallback" | string;
+  model: string | null;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   created_at: string;
+}
+
+export interface SettingsData {
+  user: User;
+  ai: {
+    configured: boolean;
+    model: string;
+  };
 }
 
 export interface AuthResponse {

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { AddApplicationModal } from "./components/AddApplicationModal";
+import { AnalyticsPage } from "./components/AnalyticsPage";
 import { ApplicationDetailModal } from "./components/ApplicationDetailModal";
+import { AssistantPage } from "./components/AssistantPage";
 import { AuthPage } from "./components/AuthPage";
 import { Icon } from "./components/Icon";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
+import { SettingsPage } from "./components/SettingsPage";
 import { Stats } from "./components/Stats";
 import type {
   ApplicationCreate,
@@ -18,6 +21,7 @@ import type {
 } from "./types";
 
 const emptyStats: DashboardStats = { total: 0, active: 0, interviews: 0, offers: 0, response_rate: 0 };
+type Page = "applications" | "analytics" | "assistant" | "settings";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +34,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<Page>("applications");
 
   const loadData = useCallback(async () => {
     try {
@@ -101,6 +106,7 @@ export default function App() {
     setApplications([]);
     setStats(emptyStats);
     setError(null);
+    setPage("applications");
   }
 
   async function addApplication(payload: ApplicationCreate) {
@@ -155,33 +161,20 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar user={user} onLogout={logout} />
+      <Sidebar user={user} onLogout={logout} currentPage={page} onNavigate={setPage} />
       <main className="main-content">
-        <header className="topbar">
-          <div>
-            <span className="eyebrow">APPLICATION COMMAND CENTRE</span>
-            <h1>Good morning, {user.name.split(" ")[0]} <span aria-hidden="true">👋</span></h1>
-            <p>Here’s where your job search stands today.</p>
-          </div>
-          <button className="button primary" onClick={() => setModalOpen(true)}><Icon name="plus" /> Add application</button>
-        </header>
-
         {error && <div className="alert" role="alert"><span>{error}</span><button onClick={() => setError(null)}>Dismiss</button></div>}
 
-        {loading ? (
-          <div className="loading-state"><span className="spinner" /> Loading your applications…</div>
-        ) : (
-          <>
-            <Stats stats={stats} />
-            <section className="board-section">
-              <div className="section-heading">
-                <div><h2>Application pipeline</h2><p>Drag cards between columns as you make progress.</p></div>
-                <label className="search-box"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search company or role" aria-label="Search applications" /></label>
-              </div>
-              <KanbanBoard applications={filtered} onOpen={(application) => setSelectedApplicationId(application.id)} onMove={moveApplication} onDelete={deleteApplication} />
-            </section>
-          </>
-        )}
+        {page === "applications" && <>
+          <header className="topbar">
+            <div><span className="eyebrow">APPLICATION COMMAND CENTRE</span><h1>Good morning, {user.name.split(" ")[0]} <span aria-hidden="true">👋</span></h1><p>Here’s where your job search stands today.</p></div>
+            <button className="button primary" onClick={() => setModalOpen(true)}><Icon name="plus" /> Add application</button>
+          </header>
+          {loading ? <div className="loading-state"><span className="spinner" /> Loading your applications…</div> : <><Stats stats={stats} /><section className="board-section"><div className="section-heading"><div><h2>Application pipeline</h2><p>Drag cards between columns as you make progress.</p></div><label className="search-box"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search company or role" aria-label="Search applications" /></label></div><KanbanBoard applications={filtered} onOpen={(application) => setSelectedApplicationId(application.id)} onMove={moveApplication} onDelete={deleteApplication} /></section></>}
+        </>}
+        {page === "analytics" && <AnalyticsPage />}
+        {page === "assistant" && <AssistantPage applications={applications} onOpenApplication={(id) => { setPage("applications"); setSelectedApplicationId(id); }} />}
+        {page === "settings" && <SettingsPage user={user} onUserUpdated={setUser} onAccountDeleted={logout} />}
       </main>
       <AddApplicationModal open={modalOpen} saving={saving} onClose={() => setModalOpen(false)} onSubmit={addApplication} />
       {selectedApplication && (

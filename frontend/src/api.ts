@@ -1,6 +1,8 @@
 import type {
   Activity,
   AIAnalysis,
+  AnalyticsData,
+  AssistantResponse,
   ApplicationKit,
   ApplicationCreate,
   ApplicationStatus,
@@ -11,6 +13,7 @@ import type {
   JobApplication,
   LoginCredentials,
   RegisterData,
+  SettingsData,
   User,
 } from "./types";
 
@@ -80,6 +83,14 @@ export const api = {
       }),
     ),
   getMe: () => request<User>("/auth/me"),
+  getSettings: () => request<SettingsData>("/settings"),
+  updateProfile: (payload: { name: string; email: string }) =>
+    request<User>("/settings/profile", { method: "PATCH", body: JSON.stringify(payload) }),
+  updatePassword: (payload: { current_password: string; new_password: string }) =>
+    request<void>("/settings/password", { method: "POST", body: JSON.stringify(payload) }),
+  exportData: () => request<Record<string, unknown>>("/settings/export"),
+  deleteAccount: (currentPassword: string) =>
+    request<void>("/settings/account", { method: "DELETE", body: JSON.stringify({ current_password: currentPassword }) }),
   listApplications: () => request<JobApplication[]>("/applications"),
   getApplication: (id: number) => request<JobApplication>(`/applications/${id}`),
   listActivities: (id: number) => request<Activity[]>(`/applications/${id}/activities`),
@@ -99,6 +110,9 @@ export const api = {
   getApplicationKit: (id: number) => request<ApplicationKit | null>(`/applications/${id}/application-kit`),
   generateApplicationKit: (id: number) => request<ApplicationKit>(`/applications/${id}/application-kit`, { method: "POST" }),
   getStats: () => request<DashboardStats>("/stats"),
+  getAnalytics: () => request<AnalyticsData>("/analytics"),
+  askAssistant: (question: string) =>
+    request<AssistantResponse>("/assistant", { method: "POST", body: JSON.stringify({ question }) }),
   createApplication: (payload: ApplicationCreate) =>
     request<JobApplication>("/applications", {
       method: "POST",

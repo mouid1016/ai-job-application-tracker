@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, FastAPI, File, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,18 +11,28 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import SessionLocal, engine, get_db
 from .document_service import document_path, read_upload, remove_document, store_document
-from .ai_service import analyse_match, description_hash, generate_application_kit
+from .ai_service import answer_career_question, analyse_match, description_hash, generate_application_kit
 from .models import AIAnalysis, Activity, Application, ApplicationKit, ApplicationStatus, Document, User
 from .schemas import (
     AIAnalysisRead,
+    AIConfigurationRead,
     ActivityRead,
+    AnalyticsApplication,
+    AnalyticsPoint,
+    AnalyticsRead,
+    AssistantRequest,
+    AssistantResponse,
     ApplicationKitRead,
     ApplicationCreate,
     ApplicationRead,
     ApplicationUpdate,
+    DeleteAccountRequest,
     DocumentRead,
     LoginRequest,
+    PasswordUpdate,
+    ProfileUpdate,
     RegisterRequest,
+    SettingsRead,
     StatsRead,
     TokenRead,
     UserRead,
@@ -165,7 +176,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="0.5.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="0.6.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -225,6 +236,114 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenRead:
 @app.get("/api/auth/me", response_model=UserRead)
 def get_me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@app.get("/api/settings", response_model=SettingsRead)
+def get_settings(current_user: User = Depends(get_current_user)) -> SettingsRead:
+    return SettingsRead(
+        user=UserRead.model_validate(current_user),
+        ai=AIConfigurationRead(
+            configured=bool(settings.openai_api_key),
+            model=settings.openai_model,
+        ),
+    )
+
+
+@app.patch("/api/settings/profile", response_model=UserRead)
+def update_profile(
+    payload: ProfileUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> User:
+    existing = db.scalar(
+        select(User).where(
+            func.lower(User.email) == payload.email,
+            User.id != current_user.id,
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+    current_user.name = payload.name
+    current_user.email = payload.email
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@app.post("/api/settings/password", status_code=status.HTTP_204_NO_CONTENT)
+def update_password(
+    payload: PasswordUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.hashed_password = hash_password(payload.new_password)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/api/settings/export")
+def export_account_data(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, object]:
+    applications = list(
+        db.scalars(
+            select(Application)
+            .where(Application.user_id == current_user.id)
+            .order_by(Application.created_at.asc())
+        ).all()
+    )
+    analyses = {
+        item.application_id: item
+        for item in db.scalars(select(AIAnalysis).where(AIAnalysis.user_id == current_user.id)).all()
+    }
+    kits = {
+        item.application_id: item
+        for item in db.scalars(select(ApplicationKit).where(ApplicationKit.user_id == current_user.id)).all()
+    }
+    records: list[dict[str, object]] = []
+    for application in applications:
+        record = ApplicationRead.model_validate(application).model_dump(mode="json")
+        analysis = analyses.get(application.id)
+        kit = kits.get(application.id)
+        record["analysis"] = {
+            "match_score": analysis.match_score,
+            "matching_skills": analysis.matching_skills,
+            "missing_skills": analysis.missing_skills,
+            "summary": analysis.summary,
+        } if analysis else None
+        record["application_kit"] = {
+            "cover_letter": kit.cover_letter,
+            "elevator_pitch": kit.elevator_pitch,
+            "interview_questions": kit.interview_questions,
+            "questions_to_ask": kit.questions_to_ask,
+        } if kit else None
+        records.append(record)
+    return {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "user": UserRead.model_validate(current_user).model_dump(mode="json"),
+        "applications": records,
+    }
+
+
+@app.delete("/api/settings/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    payload: DeleteAccountRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    if not verify_password(payload.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    stored_filenames = list(
+        db.scalars(select(Document.stored_filename).where(Document.user_id == current_user.id)).all()
+    )
+    db.delete(current_user)
+    db.commit()
+    for stored_filename in stored_filenames:
+        remove_document(stored_filename)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/api/applications", response_model=list[ApplicationRead])
@@ -787,11 +906,140 @@ def get_stats(
     rejected = counts.get(ApplicationStatus.rejected, 0)
     offers = counts.get(ApplicationStatus.offer, 0)
     interviews = counts.get(ApplicationStatus.interview, 0)
-    responses = interviews + offers + rejected
+    assessments = counts.get(ApplicationStatus.assessment, 0)
+    responses = assessments + interviews + offers + rejected
     return StatsRead(
         total=total,
         active=total - offers - rejected,
         interviews=interviews,
         offers=offers,
         response_rate=round((responses / total * 100) if total else 0, 1),
+    )
+
+
+def recent_months(count: int = 6) -> list[tuple[int, int]]:
+    today = date.today()
+    months: list[tuple[int, int]] = []
+    year, month = today.year, today.month
+    for _ in range(count):
+        months.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    return list(reversed(months))
+
+
+def analytics_application(application: Application) -> AnalyticsApplication:
+    return AnalyticsApplication(
+        id=application.id,
+        company=application.company,
+        role=application.role,
+        status=application.status.value,
+        deadline=application.deadline,
+        match_score=application.match_score,
+    )
+
+
+@app.get("/api/analytics", response_model=AnalyticsRead)
+def get_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AnalyticsRead:
+    applications = list(
+        db.scalars(
+            select(Application)
+            .where(Application.user_id == current_user.id)
+            .order_by(Application.created_at.asc())
+        ).all()
+    )
+    status_counts = {application_status.value: 0 for application_status in ApplicationStatus}
+    for application in applications:
+        status_counts[application.status.value] += 1
+
+    total = len(applications)
+    responses = status_counts["assessment"] + status_counts["interview"] + status_counts["offer"] + status_counts["rejected"]
+    interviews = status_counts["interview"] + status_counts["offer"]
+    scores = [application.match_score for application in applications if application.match_score is not None]
+    month_counts = Counter((application.created_at.year, application.created_at.month) for application in applications)
+    monthly = [
+        AnalyticsPoint(label=date(year, month, 1).strftime("%b %Y"), value=month_counts[(year, month)])
+        for year, month in recent_months()
+    ]
+    upcoming = sorted(
+        [
+            application
+            for application in applications
+            if application.deadline is not None
+            and application.deadline >= date.today()
+            and application.status not in {ApplicationStatus.offer, ApplicationStatus.rejected}
+        ],
+        key=lambda application: application.deadline or date.max,
+    )[:5]
+    top_matches = sorted(
+        [application for application in applications if application.match_score is not None],
+        key=lambda application: application.match_score or 0,
+        reverse=True,
+    )[:5]
+    return AnalyticsRead(
+        total=total,
+        active=total - status_counts["offer"] - status_counts["rejected"],
+        response_rate=round(responses / total * 100, 1) if total else 0,
+        interview_rate=round(interviews / total * 100, 1) if total else 0,
+        offer_rate=round(status_counts["offer"] / total * 100, 1) if total else 0,
+        average_match_score=round(sum(scores) / len(scores), 1) if scores else None,
+        analysed_applications=len(scores),
+        status_counts=status_counts,
+        monthly_applications=monthly,
+        upcoming_deadlines=[analytics_application(application) for application in upcoming],
+        top_matches=[analytics_application(application) for application in top_matches],
+    )
+
+
+@app.post("/api/assistant", response_model=AssistantResponse)
+def ask_assistant(
+    payload: AssistantRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AssistantResponse:
+    applications = list(
+        db.scalars(
+            select(Application)
+            .where(Application.user_id == current_user.id)
+            .order_by(Application.updated_at.desc())
+        ).all()
+    )
+    analyses = list(
+        db.scalars(select(AIAnalysis).where(AIAnalysis.user_id == current_user.id)).all()
+    )
+    missing_skill_counts = Counter(
+        skill
+        for analysis in analyses
+        for skill in analysis.missing_skills
+    )
+    context = [
+        {
+            "id": application.id,
+            "company": application.company,
+            "role": application.role,
+            "status": application.status.value,
+            "location": application.location,
+            "deadline": application.deadline.isoformat() if application.deadline else None,
+            "match_score": application.match_score,
+            "created_at": application.created_at.date().isoformat(),
+        }
+        for application in applications
+    ]
+    result = answer_career_question(
+        payload.question,
+        context,
+        [skill for skill, _ in missing_skill_counts.most_common(10)],
+    )
+    return AssistantResponse(
+        answer=result.answer,
+        highlights=result.highlights,
+        recommended_actions=result.recommended_actions,
+        related_application_ids=result.related_application_ids,
+        provider=result.provider,
+        model=result.model,
     )

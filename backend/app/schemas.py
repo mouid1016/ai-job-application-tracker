@@ -94,6 +94,40 @@ class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ProfileUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: EmailStr
+
+    @field_validator("name")
+    @classmethod
+    def strip_profile_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("email")
+    @classmethod
+    def normalise_profile_email(cls, value: EmailStr) -> str:
+        return str(value).strip().lower()
+
+
+class PasswordUpdate(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class DeleteAccountRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class AIConfigurationRead(BaseModel):
+    configured: bool
+    model: str
+
+
+class SettingsRead(BaseModel):
+    user: UserRead
+    ai: AIConfigurationRead
+
+
 class TokenRead(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -174,3 +208,49 @@ class ApplicationKitRead(BaseModel):
     is_stale: bool
     created_at: datetime
     updated_at: datetime
+
+
+class AnalyticsPoint(BaseModel):
+    label: str
+    value: int
+
+
+class AnalyticsApplication(BaseModel):
+    id: int
+    company: str
+    role: str
+    status: str
+    deadline: date | None = None
+    match_score: int | None = None
+
+
+class AnalyticsRead(BaseModel):
+    total: int
+    active: int
+    response_rate: float
+    interview_rate: float
+    offer_rate: float
+    average_match_score: float | None
+    analysed_applications: int
+    status_counts: dict[str, int]
+    monthly_applications: list[AnalyticsPoint]
+    upcoming_deadlines: list[AnalyticsApplication]
+    top_matches: list[AnalyticsApplication]
+
+
+class AssistantRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=500)
+
+    @field_validator("question")
+    @classmethod
+    def strip_question(cls, value: str) -> str:
+        return value.strip()
+
+
+class AssistantResponse(BaseModel):
+    answer: str
+    highlights: list[str]
+    recommended_actions: list[str]
+    related_application_ids: list[int]
+    provider: str
+    model: str | None
